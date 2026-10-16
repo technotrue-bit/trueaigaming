@@ -96,12 +96,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   const ua = String(req.headers['user-agent'] ?? '').slice(0, MAX_UA);
   const record = { type, game, message, contact, ua, ipHash, receivedAt };
 
+  const pathname = `feedback/${receivedAt.slice(0, 10)}/${now}-${randomBytes(6).toString('hex')}.json`;
   try {
-    await put(`feedback/${receivedAt.slice(0, 10)}/${now}-${randomBytes(6).toString('hex')}.json`, JSON.stringify(record, null, 2), {
+    const blob = await put(pathname, JSON.stringify(record, null, 2), {
       access: 'private',
       contentType: 'application/json',
       addRandomSuffix: false,
     });
+    console.log('feedback: saved', blob.pathname || pathname);
   } catch (err) {
     console.error('feedback: blob put failed', err);
     return send(res, 500, { ok: false, error: 'Could not save feedback' });

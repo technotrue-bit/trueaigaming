@@ -1,2 +1,8 @@
 node_modules
 dist
+.vercel
+.env
+.env.*
+!.env.example
+scripts/.*.tmp.mjs
+shots/
