@@ -317,8 +317,14 @@ a {
 }
 .play-body {
   position: fixed;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   width: 100%;
+  /* The global body min-height: 100vh is the large viewport on iOS < 15.4 (no dvh), which would
+     push the bottom of the game under Safari's toolbar. */
+  min-height: 0;
 }
 
 .visually-hidden {
@@ -336,15 +342,23 @@ a {
 
 .stage {
   position: absolute;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   background: #000;
 }
 .stage::backdrop {
   background: #000;
 }
+/* iOS reports zero safe-area insets inside an iframe, so the game can't pad itself clear of
+   the notch and home indicator when embedded. Inset the frame by the page's own insets instead. */
 .frame-wrap {
   position: absolute;
-  inset: 0;
+  top: env(safe-area-inset-top, 0px);
+  right: env(safe-area-inset-right, 0px);
+  bottom: env(safe-area-inset-bottom, 0px);
+  left: env(safe-area-inset-left, 0px);
 }
 .game-frame {
   display: block;
