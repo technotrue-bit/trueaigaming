@@ -5,13 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && tsc -p api && vite build",
     "preview": "vite preview",
     "thumb": "node scripts/thumb.mjs"
   },
   "devDependencies": {
+    "@types/node": "^20.19.43",
     "playwright": "1.62.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.4"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.8.2"
   }
 }

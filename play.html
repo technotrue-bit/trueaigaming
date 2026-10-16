@@ -1,25 +1,30 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="play-html">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="dark" />
-    <meta name="theme-color" content="#0b0221" />
+    <meta name="theme-color" content="#000000" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Play: TrueAIGaming</title>
   </head>
   <body class="play-body">
-    <header class="play-bar">
-      <a class="back" href="/">&larr; <span class="logo-mini">TrueAIGaming</span></a>
-      <h1 id="title" class="play-title">Loading&hellip;</h1>
-      <a id="open" class="btn btn-primary" href="/" target="_blank" rel="noopener" hidden>Open full screen in new tab &#8599;</a>
-    </header>
-    <main class="stage">
+    <main id="stage" class="stage">
+      <h1 id="title" class="visually-hidden">Loading&hellip;</h1>
       <div id="frame-wrap" class="frame-wrap"></div>
-      <p id="fallback" class="fallback" hidden>
-        Game not loading or controls feel cramped?
-        <a id="open-alt" href="/" target="_blank" rel="noopener">Play in a new tab &#8599;</a>
-      </p>
+      <nav id="hud" class="hud" aria-label="Game controls">
+        <a class="hud-btn" href="/" aria-label="Back to TrueAIGaming">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+        </a>
+        <button id="fullscreen" class="hud-btn" type="button" aria-label="Full screen" hidden>
+          <svg class="icon-enter" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /></svg>
+          <svg class="icon-exit" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5" /></svg>
+        </button>
+        <a id="new-tab" class="hud-btn" href="/" target="_blank" rel="noopener" aria-label="Open game in a new tab" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" /></svg>
+        </a>
+        <button id="feedback" class="hud-btn hud-emoji" type="button" aria-label="Report a bug or add suggestions"><span aria-hidden="true">⚙️</span></button>
+      </nav>
     </main>
     <script type="module" src="/src/play.ts"></script>
   </body>
