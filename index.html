@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b0221" />
+    <meta name="description" content="TrueAIGaming: a free arcade of games built with AI. Pick one and play instantly in your browser." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>TrueAIGaming: games built with AI</title>
+  </head>
+  <body>
+    <a class="skip" href="#games">Skip to games</a>
+    <header class="hero">
+      <h1 class="logo"><span class="logo-true">True</span><span class="logo-ai">AI</span><span class="logo-gaming">Gaming</span></h1>
+      <p class="tagline">Real games. Built with AI. Free to play, right now.</p>
+    </header>
+    <main id="games" class="wrap">
+      <div class="section-head">
+        <h2>Insert coin</h2>
+        <p id="count" class="muted" aria-live="polite"></p>
+      </div>
+      <ul id="grid" class="grid" aria-busy="true"></ul>
+    </main>
+    <footer class="footer wrap">
+      <p>No accounts. No ads. No trackers. Just games.</p>
+    </footer>
+    <script type="module" src="/src/home.ts"></script>
+  </body>
+</html>

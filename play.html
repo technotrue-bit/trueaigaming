@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b0221" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Play: TrueAIGaming</title>
+  </head>
+  <body class="play-body">
+    <header class="play-bar">
+      <a class="back" href="/">&larr; <span class="logo-mini">TrueAIGaming</span></a>
+      <h1 id="title" class="play-title">Loading&hellip;</h1>
+      <a id="open" class="btn btn-primary" href="/" target="_blank" rel="noopener" hidden>Open full screen in new tab &#8599;</a>
+    </header>
+    <main class="stage">
+      <div id="frame-wrap" class="frame-wrap"></div>
+      <p id="fallback" class="fallback" hidden>
+        Game not loading or controls feel cramped?
+        <a id="open-alt" href="/" target="_blank" rel="noopener">Play in a new tab &#8599;</a>
+      </p>
+    </main>
+    <script type="module" src="/src/play.ts"></script>
+  </body>
+</html>

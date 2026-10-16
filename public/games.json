@@ -1,0 +1,11 @@
+[
+  {
+    "id": "super-star-party",
+    "name": "Super Star Party",
+    "description": "A 4-player party board game",
+    "playUrl": "https://super-star-party.vercel.app",
+    "thumbnail": "/thumbs/super-star-party.png",
+    "status": "live",
+    "repo": "https://github.com/technotrue-bit/super-star-party"
+  }
+]
