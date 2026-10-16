@@ -6,9 +6,6 @@ const count = document.getElementById('count') as HTMLParagraphElement;
 
 attachFeedback(document.getElementById('feedback') as HTMLButtonElement);
 
-/** Phones/tablets get the game directly: the framed play page adds nothing on a small touch screen. */
-const touchFirst = matchMedia('(pointer: coarse)').matches;
-
 function card(game: Game, index: number): HTMLLIElement {
   const img = el('img', {
     src: game.thumbnail,
@@ -30,7 +27,7 @@ function card(game: Game, index: number): HTMLLIElement {
     'div',
     { class: 'card-actions' },
     el('a', { class: 'btn btn-primary', href: game.playUrl, target: '_blank', rel: 'noopener' }, 'Play ↗'),
-    el('a', { class: 'btn btn-ghost', href: touchFirst ? game.playUrl : `/play.html?id=${encodeURIComponent(game.id)}` }, 'Play here'),
+    el('a', { class: 'btn btn-ghost', href: `/play.html?id=${encodeURIComponent(game.id)}` }, 'Play here'),
   );
   if (game.repo) {
     actions.append(el('a', { class: 'btn btn-link', href: game.repo, target: '_blank', rel: 'noopener' }, 'Source'));
