@@ -1,3 +1,4 @@
+import './analytics';
 import { attachFeedback } from './feedback';
 import { el, loadGames, statusClass, type Game } from './games';
 
