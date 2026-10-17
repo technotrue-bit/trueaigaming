@@ -2,7 +2,7 @@
 
 A free, public arcade of games built with AI. Every game listed here was made with AI tools and is free to play in the browser.
 
-It's a static site: Vite + vanilla TypeScript, no backend, no accounts, no trackers, no third-party fonts or CDNs. One file, [`public/games.json`](public/games.json), drives the whole thing.
+It's a static site: Vite + vanilla TypeScript, no accounts, no third-party fonts or CDNs; cookieless Vercel Web Analytics counts page views. One file, [`public/games.json`](public/games.json), drives the whole thing.
 
 - **Home (`/`)**: a grid of game cards. Each card links straight to the game's live URL (new tab).
 - **Play page (`/play.html?id=<game-id>`)**: embeds the game in an iframe, with a prominent "Open full screen in new tab" link for when embedding doesn't work well (mobile, fullscreen, games that block framing).
