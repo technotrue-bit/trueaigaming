@@ -18,7 +18,7 @@ function card(game: Game, index: number): HTMLLIElement {
 
   const cover = el(
     'a',
-    { class: 'card-cover', href: game.playUrl, target: '_blank', rel: 'noopener', 'aria-label': `Play ${game.name} (opens in new tab)` },
+    { class: 'card-cover', href: game.playUrl, target: '_blank', rel: 'noopener', 'aria-label': `Play ${game.name} in browser (opens in new tab)` },
     img,
     el('span', { class: statusClass(game.status) }, game.status),
   );
@@ -26,7 +26,7 @@ function card(game: Game, index: number): HTMLLIElement {
   const actions = el(
     'div',
     { class: 'card-actions' },
-    el('a', { class: 'btn btn-primary', href: game.playUrl, target: '_blank', rel: 'noopener' }, 'Play ↗'),
+    el('a', { class: 'btn btn-primary', href: game.playUrl, target: '_blank', rel: 'noopener' }, 'Play in browser ↗'),
     el('a', { class: 'btn btn-ghost', href: `/play.html?id=${encodeURIComponent(game.id)}` }, 'Play here'),
   );
   if (game.repo) {
