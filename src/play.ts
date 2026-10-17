@@ -1,5 +1,5 @@
 import { attachFeedback } from './feedback';
-import { el, loadGames } from './games';
+import { el, loadGames, type Game } from './games';
 
 /** Safari (incl. older iPadOS) only ships the prefixed Fullscreen API. */
 interface WebkitDocument extends Document {
@@ -18,6 +18,118 @@ const hud = document.getElementById('hud') as HTMLElement;
 const fullscreenBtn = document.getElementById('fullscreen') as HTMLButtonElement;
 const newTab = document.getElementById('new-tab') as HTMLAnchorElement;
 const frameWrap = document.getElementById('frame-wrap') as HTMLDivElement;
+
+/* ---------- Viewport tracking ----------
+   Size the stage to the area the user can actually see (visualViewport tracks Safari's bars showing and hiding,
+   rotation and full screen), and publish it to CSS on <html>:
+     --vw / --vh               visible size in px
+     --usable-w / --usable-h   visible size minus safe-area insets (what the game frame gets)
+     --vmin                    1% of the smaller visible side, for sizing the overlay
+   plus is-portrait / is-landscape and a size class from the usable area's shorter side:
+     size-compact < 500px (phones)  <=  size-regular < 900px (tablets, laptops)  <=  size-wide.
+   Until this runs (or without JS) the CSS falls back to 100vh / -webkit-fill-available / 100dvh. */
+const root = document.documentElement;
+const SIZE_CLASSES = [
+  ['size-compact', 500],
+  ['size-regular', 900],
+  ['size-wide', Infinity],
+] as const;
+
+// env() can't be read from JS directly, so read it back off a hidden element padded by the insets.
+const safeProbe = el('div', { class: 'safe-probe', 'aria-hidden': 'true' });
+document.body.append(safeProbe);
+
+let visible = { w: 0, h: 0 };
+let measureQueued = 0;
+
+function isEditingText(): boolean {
+  const a = document.activeElement;
+  return a instanceof HTMLTextAreaElement || (a instanceof HTMLInputElement && a.type !== 'radio');
+}
+
+function measure(): void {
+  measureQueued = 0;
+  const vv = window.visualViewport;
+  // Undo pinch zoom so zooming in doesn't shrink the stage.
+  const w = vv ? vv.width * vv.scale : window.innerWidth;
+  const h = vv ? vv.height * vv.scale : window.innerHeight;
+  // The on-screen keyboard for the feedback form shrinks the visual viewport; keep the game where it is.
+  if (isEditingText() && Math.abs(w - visible.w) < 1 && h < visible.h) return;
+  visible = { w, h };
+
+  const cs = getComputedStyle(safeProbe);
+  const inset = (side: 'Top' | 'Right' | 'Bottom' | 'Left') => parseFloat(cs[`padding${side}`]) || 0;
+  const usableW = Math.max(0, w - inset('Left') - inset('Right'));
+  const usableH = Math.max(0, h - inset('Top') - inset('Bottom'));
+  const landscape = w > h;
+  const shortSide = Math.min(usableW, usableH);
+  const sizeClass = SIZE_CLASSES.find(([, below]) => shortSide < below)![0];
+
+  const px = (n: number) => `${Math.round(n * 100) / 100}px`;
+  root.style.setProperty('--vw', px(w));
+  root.style.setProperty('--vh', px(h));
+  root.style.setProperty('--usable-w', px(usableW));
+  root.style.setProperty('--usable-h', px(usableH));
+  root.style.setProperty('--vmin', px(Math.min(w, h) / 100));
+  root.classList.toggle('is-landscape', landscape);
+  root.classList.toggle('is-portrait', !landscape);
+  for (const [name] of SIZE_CLASSES) root.classList.toggle(name, name === sizeClass);
+  root.classList.add('has-vp');
+  fitFrame(landscape);
+}
+
+function scheduleMeasure(): void {
+  measureQueued ||= requestAnimationFrame(measure);
+}
+
+window.visualViewport?.addEventListener('resize', scheduleMeasure);
+window.visualViewport?.addEventListener('scroll', scheduleMeasure);
+window.addEventListener('resize', scheduleMeasure);
+window.addEventListener('orientationchange', () => {
+  scheduleMeasure();
+  // iOS sometimes reports the pre-rotation size on the first frame after orientationchange.
+  setTimeout(scheduleMeasure, 300);
+});
+document.addEventListener('fullscreenchange', scheduleMeasure);
+document.addEventListener('webkitfullscreenchange', scheduleMeasure);
+
+/* ---------- Fit-to-screen scaling ----------
+   Below a game's minimum size the frame is rendered at a larger logical size and scaled down uniformly so the
+   game still gets a layout it fits in (at the cost of smaller text). The logical size keeps the usable area's
+   aspect ratio, so the scaled frame fills the screen; only sub-pixel rounding is letterboxed (centered, on black).
+   At or above the minimum the frame is 1:1 and full-bleed. We never scale up: on large tablets and desktops the
+   game just gets the whole screen and handles its own large layout. Browsers map pointer/touch input into a
+   transformed iframe natively. */
+const DEFAULT_MIN = { portrait: { w: 360, h: 600 }, landscape: { w: 640, h: 360 } };
+let currentGame: Game | undefined;
+
+function fitFrame(landscape: boolean): void {
+  const frame = frameWrap.querySelector('iframe');
+  const min = landscape
+    ? { w: currentGame?.minWidthLandscape ?? DEFAULT_MIN.landscape.w, h: currentGame?.minHeightLandscape ?? DEFAULT_MIN.landscape.h }
+    : { w: currentGame?.minWidth ?? DEFAULT_MIN.portrait.w, h: currentGame?.minHeight ?? DEFAULT_MIN.portrait.h };
+  // Measure the wrapper itself: it is the usable area as laid out by CSS (stage minus safe-area insets).
+  const { width: uw, height: uh } = frameWrap.getBoundingClientRect();
+  const fit = Math.min(1, uw / min.w, uh / min.h);
+
+  if (!frame || fit >= 1 || uw <= 0 || uh <= 0) {
+    frameWrap.classList.remove('is-scaled');
+    stage.dataset.scale = '1';
+    return;
+  }
+  const w = Math.max(min.w, Math.floor(uw / fit));
+  const h = Math.max(min.h, Math.floor(uh / fit));
+  const scale = Math.min(uw / w, uh / h);
+  frameWrap.style.setProperty('--frame-w', `${w}px`);
+  frameWrap.style.setProperty('--frame-h', `${h}px`);
+  frameWrap.style.setProperty('--frame-x', `${(uw - w * scale) / 2}px`);
+  frameWrap.style.setProperty('--frame-y', `${(uh - h * scale) / 2}px`);
+  frameWrap.style.setProperty('--frame-scale', String(scale));
+  frameWrap.classList.add('is-scaled');
+  stage.dataset.scale = String(Math.round(scale * 10000) / 10000);
+}
+
+measure();
 
 /* ---------- Fullscreen (hidden where unsupported, e.g. iPhone) ---------- */
 const canFullscreen = Boolean(doc.fullscreenEnabled || (doc.webkitFullscreenEnabled && stage.webkitRequestFullscreen));
@@ -64,8 +176,7 @@ document.addEventListener('pointerdown', wake, { passive: true });
 wake();
 
 /* ---------- Feedback (dialog lives inside the stage so it still shows in full screen) ---------- */
-let currentGameId: string | undefined;
-attachFeedback(document.getElementById('feedback') as HTMLButtonElement, { mount: stage, currentGame: () => currentGameId });
+attachFeedback(document.getElementById('feedback') as HTMLButtonElement, { mount: stage, currentGame: () => currentGame?.id });
 
 /* ---------- Load the game ---------- */
 function showMessage(heading: string, message: string): void {
@@ -83,7 +194,7 @@ try {
   } else {
     document.title = `${game.name}: TrueAIGaming`;
     title.textContent = game.name;
-    currentGameId = game.id;
+    currentGame = game;
     newTab.href = game.playUrl;
     newTab.hidden = false;
     fullscreenBtn.hidden = !canFullscreen;
@@ -97,6 +208,7 @@ try {
         referrerpolicy: 'strict-origin-when-cross-origin',
       }),
     );
+    measure();
   }
 } catch (err) {
   console.error(err);

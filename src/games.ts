@@ -8,6 +8,17 @@ export interface Game {
   thumbnail: string;
   status: string;
   repo?: string;
+  /** Smallest viewport (CSS px) the game's portrait layout fits. Below it the play page scales the frame down. */
+  minWidth?: number;
+  minHeight?: number;
+  /** Same, for landscape. */
+  minWidthLandscape?: number;
+  minHeightLandscape?: number;
+}
+
+/** Min-size hints must be sane CSS pixel sizes; anything else is ignored so the play page defaults apply. */
+function minSize(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 200 && value <= 4000 ? Math.round(value) : undefined;
 }
 
 /** Only allow https URLs so games.json can't inject javascript:/data: links. */
@@ -44,6 +55,10 @@ function parseGame(raw: unknown): Game | null {
     thumbnail,
     status: isNonEmptyString(r.status) ? r.status.toLowerCase() : 'live',
     repo: safeHttpsUrl(r.repo) ?? undefined,
+    minWidth: minSize(r.minWidth),
+    minHeight: minSize(r.minHeight),
+    minWidthLandscape: minSize(r.minWidthLandscape),
+    minHeightLandscape: minSize(r.minHeightLandscape),
   };
 }
 

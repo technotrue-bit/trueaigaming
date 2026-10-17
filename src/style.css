@@ -326,6 +326,26 @@ a {
      push the bottom of the game under Safari's toolbar. */
   min-height: 0;
 }
+/* Once play.ts has measured the visual viewport, size to exactly what is visible. */
+.has-vp.play-html,
+.has-vp .play-body {
+  height: var(--vh);
+}
+.has-vp .play-body {
+  right: auto;
+  bottom: auto;
+  width: var(--vw);
+}
+.safe-probe {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  visibility: hidden;
+  pointer-events: none;
+}
 
 .visually-hidden {
   position: absolute;
@@ -366,6 +386,19 @@ a {
   height: 100%;
   border: 0;
 }
+/* Smaller than the game's minimum size: play.ts renders the frame at a larger logical size and scales it down. */
+.frame-wrap.is-scaled {
+  overflow: hidden;
+}
+.is-scaled .game-frame {
+  position: absolute;
+  top: var(--frame-y);
+  left: var(--frame-x);
+  width: var(--frame-w);
+  height: var(--frame-h);
+  transform: scale(var(--frame-scale));
+  transform-origin: 0 0;
+}
 .stage-msg {
   display: grid;
   place-content: center;
@@ -386,22 +419,39 @@ a {
   margin: 0;
 }
 
-/* Tiny top-center pill, clear of the game's own corner controls. Only the buttons take touches. */
+/* Small pill, clear of the game's own corner controls: top-center in portrait, a vertical pill on the left
+   edge in landscape (where top-center would cover the game's heading). Only the buttons take touches.
+   The drawn pill is the ::before below; each button's box is a transparent >= 44px tap target around it. */
 .hud {
+  --hud-u: clamp(26px, calc(var(--vmin, 1vmin) * 7), 36px); /* drawn button size */
+  --hud-hit: max(44px, calc(var(--hud-u) + 12px)); /* tap target */
   position: absolute;
-  top: calc(4px + env(safe-area-inset-top, 0px));
+  top: env(safe-area-inset-top, 0px);
   left: 50%;
   z-index: 2;
   display: flex;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid rgb(255 255 255 / 0.2);
-  border-radius: 999px;
-  background: rgb(11 2 33 / 0.6);
   transform: translateX(-50%);
   pointer-events: none;
   opacity: 0.55;
   transition: opacity 0.4s;
+}
+.is-landscape .hud {
+  top: 50%;
+  left: env(safe-area-inset-left, 0px);
+  flex-direction: column;
+  transform: translateY(-50%);
+}
+.hud::before {
+  --pad: calc((var(--hud-hit) - var(--hud-u)) / 2 - 3px);
+  content: '';
+  position: absolute;
+  top: var(--pad);
+  right: var(--pad);
+  bottom: var(--pad);
+  left: var(--pad);
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 999px;
+  background: rgb(11 2 33 / 0.6);
 }
 .hud.is-idle {
   opacity: 0.2;
@@ -411,31 +461,45 @@ a {
   opacity: 0.9;
 }
 .hud-btn {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: var(--hud-hit);
+  height: var(--hud-hit);
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: transparent;
   color: #fff;
-  font-size: 14px;
+  font-size: calc(var(--hud-u) * 0.54);
   line-height: 1;
   cursor: pointer;
   pointer-events: auto;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
-.hud-btn:hover {
+.hud-btn::before {
+  --pad: calc((var(--hud-hit) - var(--hud-u)) / 2);
+  content: '';
+  position: absolute;
+  top: var(--pad);
+  right: var(--pad);
+  bottom: var(--pad);
+  left: var(--pad);
+  border-radius: 50%;
+}
+.hud-btn:hover::before {
   background: rgb(255 255 255 / 0.15);
 }
 .hud-btn[hidden] {
   display: none;
 }
+.hud-btn > * {
+  position: relative;
+}
 .hud-btn svg {
-  width: 15px;
-  height: 15px;
+  width: calc(var(--hud-u) * 0.58);
+  height: calc(var(--hud-u) * 0.58);
   fill: none;
   stroke: currentColor;
   stroke-width: 2.25;
@@ -478,6 +542,7 @@ a {
 .fb-dialog {
   width: min(28rem, 100% - 2rem);
   max-height: calc(100% - 2rem);
+  max-height: calc(100dvh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   padding: 1.1rem 1.2rem 1.2rem;
   border: 2px solid var(--pink);
   border-radius: var(--radius);
@@ -488,6 +553,10 @@ a {
   box-shadow: 0 0 36px rgb(255 43 214 / 0.45);
   overflow: auto;
   overscroll-behavior: contain;
+}
+/* Play page: fit the dialog to the measured visible height (Safari's bars, short landscape phones). */
+.has-vp .fb-dialog {
+  max-height: calc(var(--vh) - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
 }
 .fb-dialog::backdrop {
   background: rgb(0 0 0 / 0.65);
@@ -632,6 +701,18 @@ a {
   font-size: 1.05rem;
   font-weight: 700;
   color: var(--lime);
+}
+/* Short screens (landscape phones): tighten the dialog so more of the form fits before it scrolls. */
+@media (max-height: 480px) {
+  .fb-dialog {
+    padding: 0.75rem 1rem 0.9rem;
+  }
+  .fb-head {
+    margin-bottom: 0.4rem;
+  }
+  .fb-form textarea {
+    min-height: 4.5rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
