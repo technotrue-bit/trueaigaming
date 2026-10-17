@@ -723,3 +723,10 @@ a {
     transition: none !important;
   }
 }
+
+/* "Play here" is the main action: give it the whole first row of the card. */
+.card-actions .btn-primary {
+  flex: 1 1 100%;
+  justify-content: center;
+  text-align: center;
+}
