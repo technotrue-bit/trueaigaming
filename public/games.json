@@ -6,7 +6,6 @@
     "playUrl": "https://super-star-party.vercel.app",
     "thumbnail": "/thumbs/super-star-party.png",
     "status": "live",
-    "repo": "https://github.com/technotrue-bit/super-star-party",
-    "minHeightLandscape": 500
+    "repo": "https://github.com/technotrue-bit/super-star-party"
   }
 ]

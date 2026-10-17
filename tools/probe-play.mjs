@@ -1,6 +1,6 @@
 // Responsive probe for the play page. Run against a built preview:
-//   npm run build && npx vite preview --port 5291 --strictPort &
-//   node tools/probe-play.mjs                 # PROBE_URL=http://127.0.0.1:5291 by default
+//   npm run build && npx vite preview --host 127.0.0.1 --port 4173 --strictPort &
+//   node tools/probe-play.mjs                 # PROBE_URL=http://127.0.0.1:4173 by default
 // Checks every size x browser below, prints a table, writes shots/responsive/report.json, per-combo screenshots
 // and a contact sheet. Exits 1 on any FAIL.
 // Not covered: safe-area insets (Playwright can't simulate env(safe-area-inset-*)) and real Safari toolbars.
@@ -10,7 +10,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
-const BASE = (arg('url') ?? process.env.PROBE_URL ?? 'http://127.0.0.1:5291').replace(/\/$/, '');
+const BASE = (arg('url') ?? process.env.PROBE_URL ?? 'http://127.0.0.1:4173').replace(/\/$/, '');
 const OUT = resolve('shots/responsive');
 const TIMEOUT = 45_000;
 // Optional filters for quick iteration: --sizes=320x568,844x390 --browsers=webkit (or PROBE_SIZES / PROBE_BROWSERS)
