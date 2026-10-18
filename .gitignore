@@ -1,5 +1,7 @@
 node_modules
 dist
+# Generated from public/games.json by scripts/seo.mjs on every dev/build
+/games/
 .vercel
 .env
 .env.*
