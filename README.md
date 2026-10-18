@@ -34,7 +34,7 @@ npm run preview  # serve dist/ locally
 
    | Field         | Notes                                                                                            |
    | ------------- | ------------------------------------------------------------------------------------------------ |
-   | `id`          | Unique, URL-safe slug. Used in `play.html?id=…`.                                                 |
+   | `id`          | Unique, URL-safe slug (`a-z`, `0-9`, `-`). Used in `play.html?id=…` and `/games/<id>/`.          |
    | `name`        | Display name.                                                                                    |
    | `description` | Short one-liner shown on the card.                                                               |
    | `playUrl`     | Live game URL. **Must be `https://`**; entries with other schemes are ignored.                   |
@@ -59,7 +59,21 @@ npm run preview  # serve dist/ locally
 
    The game's own site must also allow being framed (no `X-Frame-Options: DENY` or restrictive `frame-ancestors`). If it doesn't, the card's main Play button still works, because it opens the game in a new tab.
 
-4. Run `npm run build`, then commit and push.
+4. Run `npm run build`, then commit and push. The game's card, its `/games/<id>/` page, the home JSON-LD and `sitemap.xml` are all generated from `games.json` (see [SEO](#seo)).
+
+   Optional SEO fields: `longDescription` (game page text and meta description), `seoTitle` (overrides the derived `<title>`), `minPlayers` / `maxPlayers` (players badge and JSON-LD `numberOfPlayers`), `author` (JSON-LD, defaults to Devin Norris).
+
+## SEO
+
+Everything is generated at build (and dev) time from `public/games.json` by [`scripts/seo.mjs`](scripts/seo.mjs), wired up in [`vite.config.ts`](vite.config.ts). Adding a game to `games.json` updates all of it automatically.
+
+- **Game pages (`/games/<id>/`)**: one static HTML page per game (title, description, canonical, Open Graph/Twitter tags using the thumbnail, `VideoGame` JSON-LD, Play links). Vite config writes them to `games/<id>/index.html` (gitignored, rebuilt every run) and adds them as build inputs, so they land in `dist/games/<id>/index.html`. Styles: `src/style.css` + `src/game-page.css`; script: `src/game-page.ts`. Ids must be URL-safe slugs (`^[a-z0-9-]+$`) or the build fails.
+- **Home (`/`)**: the game cards and the "N games ready to play" count are prerendered into `index.html` so crawlers see real links without JS (`src/home.ts` still re-renders the grid). `WebSite` + `Organization` + `ItemList` JSON-LD is injected into the head.
+- **`/sitemap.xml`**: the home page plus every `/games/<id>/` page (`play.html` is `noindex, follow` and not listed). `public/robots.txt` points to it.
+- **Hosts** (`vercel.json`): `trueaigaming.vercel.app` 308-redirects to `https://trueaigaming.com`; any other `*.vercel.app` host (branch previews) gets `X-Robots-Tag: noindex, nofollow`.
+- **Google Search Console**: `index.html` has a commented, empty slot for the `google-site-verification` meta tag. Not needed if the domain is verified with a DNS TXT record.
+- **Images**: `public/og.png` (1200×630 social card) comes from `node scripts/og.mjs`. Favicons (`favicon.ico` 16/32/48, `favicon-32.png`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png`) are rendered from `public/favicon.svg` by `node scripts/icons.mjs`. Both use Playwright (`npx playwright install chromium` first); commit the resulting PNGs. `public/site.webmanifest` lists the icons.
+- **`public/404.html`**: served by Vercel for unknown paths.
 
 ## Deploy
 

@@ -634,6 +634,16 @@ a {
   color: var(--lime);
 }
 
+/* Card titles link to the game's own page (/games/<id>/). */
+.card-title a {
+  color: inherit;
+  text-decoration: none;
+}
+.card-title a:hover {
+  color: var(--cyan);
+  text-decoration: underline;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

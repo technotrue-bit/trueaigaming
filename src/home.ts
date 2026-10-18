@@ -38,7 +38,7 @@ function card(game: Game, index: number): HTMLLIElement {
     'li',
     { class: 'card' },
     cover,
-    el('div', { class: 'card-body' }, el('h3', { class: 'card-title' }, game.name), el('p', { class: 'card-desc' }, game.description), actions),
+    el('div', { class: 'card-body' }, el('h3', { class: 'card-title' }, el('a', { href: `/games/${encodeURIComponent(game.id)}/` }, game.name)), el('p', { class: 'card-desc' }, game.description), actions),
   );
 }
 
