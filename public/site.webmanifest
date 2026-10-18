@@ -1,0 +1,14 @@
+{
+  "name": "TrueAIGaming",
+  "short_name": "TrueAIGaming",
+  "description": "A free arcade of games built with AI. Pick one and play instantly in your browser.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#0b0221",
+  "background_color": "#0b0221",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
