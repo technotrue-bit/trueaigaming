@@ -303,6 +303,26 @@ a {
   color: var(--muted);
   font-size: 0.9rem;
 }
+/* Ko-fi tip link: deliberately quieter than every card/game button. */
+.tip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 0.75rem;
+  /* Clear the fixed feedback button (48px at bottom: 1rem) when scrolled to the end. */
+  margin-bottom: calc(3rem + env(safe-area-inset-bottom, 0px));
+}
+.btn-tip {
+  padding: 0.4rem 0.9rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+  border: 1px solid rgb(185 166 221 / 0.45);
+}
+.btn-tip:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
 
 /* ---------- Play page: edge-to-edge game frame ---------- */
 .play-html,

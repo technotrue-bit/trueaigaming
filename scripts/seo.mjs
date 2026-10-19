@@ -10,6 +10,7 @@ export const TWITTER = '@ItsMeTrueG';
 const DEFAULT_AUTHOR = 'Devin Norris';
 const ID = /^[a-z0-9-]+$/;
 const MAX_TITLE = 70;
+export const KOFI_URL = 'https://ko-fi.com/X3K0291W5Z';
 
 const ROOT = resolve(import.meta.dirname, '..');
 /** Generated per-game HTML entries live here (gitignored); Vite builds them to dist/games/<id>/. */
@@ -351,6 +352,7 @@ export function gamePageHtml(g) {
     </main>
     <footer class="footer wrap">
       <p>No accounts. Just games.</p>
+      <p class="tip">Tips keep the games free. <a class="btn btn-tip" href="${KOFI_URL}" target="_blank" rel="noopener">Support on Ko-fi</a></p>
     </footer>
     <button id="feedback" class="feedback-fab" type="button" aria-label="Report a bug or add suggestions"><span aria-hidden="true">⚙️</span></button>
     <script type="module" src="/src/game-page.ts"></script>
