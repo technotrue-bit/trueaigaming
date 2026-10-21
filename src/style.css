@@ -297,6 +297,25 @@ a {
   color: var(--text);
 }
 
+/* "How it was made": a quiet panel between the games and the footer. */
+.how {
+  margin-block: 2.5rem 0;
+  padding: 1.5rem;
+  background: var(--panel);
+  border: 2px solid rgb(41 243 255 / 0.5);
+  border-radius: var(--radius);
+}
+.how h2 {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 4vw, 1.75rem);
+  text-transform: uppercase;
+}
+.how p {
+  max-width: 62ch;
+  margin: 0 0 0.75rem;
+}
+
 .footer {
   padding: 3rem 0 2rem;
   text-align: center;
