@@ -34,13 +34,35 @@ function card(game: Game, index: number): HTMLLIElement {
     actions.append(el('a', { class: 'btn btn-link', href: game.repo, target: '_blank', rel: 'noopener' }, 'Source'));
   }
 
+  const head = el('div', { class: 'card-head' }, el('h3', { class: 'card-title' }, el('a', { href: `/games/${encodeURIComponent(game.id)}/` }, game.name)));
+  const how = game.howItWasMade ? el('div', { class: 'card-how', id: `how-${game.id}`, hidden: '' }, el('p', {}, game.howItWasMade)) : null;
+  if (game.howItWasMade) {
+    head.append(
+      el(
+        'button',
+        { class: 'card-info', type: 'button', 'aria-expanded': 'false', 'aria-controls': `how-${game.id}`, 'aria-label': `How ${game.name} was made` },
+        el('span', { 'aria-hidden': 'true' }, 'i'),
+      ),
+    );
+  }
+
   return el(
     'li',
     { class: 'card' },
     cover,
-    el('div', { class: 'card-body' }, el('h3', { class: 'card-title' }, el('a', { href: `/games/${encodeURIComponent(game.id)}/` }, game.name)), el('p', { class: 'card-desc' }, game.description), actions),
+    el('div', { class: 'card-body' }, head, el('p', { class: 'card-desc' }, game.description), ...(how ? [how] : []), actions),
   );
 }
+
+// Info button: show or hide the card's "How it was made" panel.
+grid.addEventListener('click', (event) => {
+  const button = (event.target as Element).closest<HTMLButtonElement>('.card-info');
+  if (!button) return;
+  const open = button.getAttribute('aria-expanded') !== 'true';
+  button.setAttribute('aria-expanded', String(open));
+  const panel = document.getElementById(button.getAttribute('aria-controls') ?? '');
+  if (panel) panel.hidden = !open;
+});
 
 try {
   const games = await loadGames();

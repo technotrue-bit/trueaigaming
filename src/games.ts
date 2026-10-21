@@ -8,6 +8,8 @@ export interface Game {
   thumbnail: string;
   status: string;
   repo?: string;
+  /** Shown behind the card's info button. Cards without it get no button. */
+  howItWasMade?: string;
   /** Smallest viewport (CSS px) the game's portrait layout fits. Below it the play page scales the frame down. */
   minWidth?: number;
   minHeight?: number;
@@ -55,6 +57,7 @@ function parseGame(raw: unknown): Game | null {
     thumbnail,
     status: isNonEmptyString(r.status) ? r.status.toLowerCase() : 'live',
     repo: safeHttpsUrl(r.repo) ?? undefined,
+    howItWasMade: isNonEmptyString(r.howItWasMade) ? r.howItWasMade.trim() : undefined,
     minWidth: minSize(r.minWidth),
     minHeight: minSize(r.minHeight),
     minWidthLandscape: minSize(r.minWidthLandscape),

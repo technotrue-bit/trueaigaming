@@ -297,23 +297,51 @@ a {
   color: var(--text);
 }
 
-/* "How it was made": a quiet panel between the games and the footer. */
-.how {
-  margin-block: 2.5rem 0;
-  padding: 1.5rem;
-  background: var(--panel);
-  border: 2px solid rgb(41 243 255 / 0.5);
-  border-radius: var(--radius);
+/* Card info button: opens the card's "How it was made" panel. */
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
 }
-.how h2 {
-  margin: 0 0 0.75rem;
+.card-head .card-title {
+  flex: 1;
+  min-width: 0;
+}
+.card-info {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: -0.5rem -0.6rem 0 0;
+  padding: 0;
+  border: 2px solid var(--cyan);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--cyan);
   font-family: var(--font-display);
-  font-size: clamp(1.25rem, 4vw, 1.75rem);
-  text-transform: uppercase;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
 }
-.how p {
-  max-width: 62ch;
-  margin: 0 0 0.75rem;
+.card-info:hover {
+  background: rgb(41 243 255 / 0.12);
+}
+.card-info[aria-expanded='true'] {
+  color: var(--bg);
+  background: var(--cyan);
+  box-shadow: 0 0 14px rgb(41 243 255 / 0.6);
+}
+.card-how {
+  margin-bottom: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  border-left: 3px solid var(--cyan);
+  background: rgb(41 243 255 / 0.06);
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+.card-how p {
+  margin: 0;
 }
 
 .footer {

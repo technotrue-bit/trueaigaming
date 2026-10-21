@@ -29,6 +29,7 @@ export const PAGES_DIR = join(ROOT, 'games');
  * @property {string} [repo]
  * @property {string} [seoTitle]
  * @property {string} [longDescription]
+ * @property {string} [howItWasMade]
  * @property {number} [minPlayers]
  * @property {number} [maxPlayers]
  * @property {string} author
@@ -129,6 +130,7 @@ export function loadGames() {
       repo: safeHttpsUrl(r.repo) ?? undefined,
       seoTitle: isNonEmptyString(r.seoTitle) ? r.seoTitle.trim() : undefined,
       longDescription: isNonEmptyString(r.longDescription) ? r.longDescription.trim() : undefined,
+      howItWasMade: isNonEmptyString(r.howItWasMade) ? r.howItWasMade.trim() : undefined,
       minPlayers,
       maxPlayers: maxPlayers && minPlayers && maxPlayers < minPlayers ? minPlayers : maxPlayers,
       author: isNonEmptyString(r.author) ? r.author.trim() : DEFAULT_AUTHOR,
@@ -232,13 +234,21 @@ export function cardHtml(g, index) {
     `<a class="btn btn-ghost" href="${esc(g.playUrl)}" target="_blank" rel="noopener">Play in browser ↗</a>`,
   ];
   if (g.repo) actions.push(`<a class="btn btn-link" href="${esc(g.repo)}" target="_blank" rel="noopener">Source</a>`);
+  const id = esc(g.id);
+  const info = g.howItWasMade
+    ? `<button class="card-info" type="button" aria-expanded="false" aria-controls="how-${id}" aria-label="How ${esc(g.name)} was made"><span aria-hidden="true">i</span></button>`
+    : '';
+  const how = g.howItWasMade ? `<div class="card-how" id="how-${id}" hidden><p>${esc(g.howItWasMade)}</p></div>` : '';
   return `<li class="card">
           <a class="card-cover" href="${esc(playPath(g))}" aria-label="Play ${esc(g.name)}">
             <img src="${esc(g.thumbnail)}" alt="${esc(g.name)} screenshot" width="1280" height="720" decoding="async" loading="${index < 2 ? 'eager' : 'lazy'}" /><span class="${statusClass(g.status)}">${esc(g.status)}</span>
           </a>
           <div class="card-body">
-            <h3 class="card-title"><a href="${esc(gamePath(g))}">${esc(g.name)}</a></h3>
+            <div class="card-head">
+              <h3 class="card-title"><a href="${esc(gamePath(g))}">${esc(g.name)}</a></h3>${info}
+            </div>
             <p class="card-desc">${esc(g.description)}</p>
+            ${how}
             <div class="card-actions">${actions.join('')}</div>
           </div>
         </li>`;

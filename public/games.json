@@ -4,6 +4,7 @@
     "name": "Super Star Party",
     "description": "A 4-player party board game",
     "longDescription": "Super Star Party is a free party board game for up to 4 players that runs right in your browser. Built with AI, with nothing to install: open it and play.",
+    "howItWasMade": "Built with AI coding agents: builder agents write each piece, and critic agents judge it against a Mario Party 7 quality bar and name the biggest gap. Its art, animation and sound are generated in code by default, with exported 3D models where needed.",
     "minPlayers": 1,
     "maxPlayers": 4,
     "playUrl": "https://super-star-party.vercel.app",
