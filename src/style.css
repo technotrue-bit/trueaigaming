@@ -344,6 +344,43 @@ a {
   margin: 0;
 }
 
+/* Player-count chips under the description. */
+.card-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.25rem;
+  padding: 0;
+  list-style: none;
+}
+.card-facts li {
+  padding: 0.2rem 0.65rem;
+  border: 1px solid rgb(185 166 221 / 0.45);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* Placeholder card after the games: dashed, no glow, never lifts on hover. */
+.card-soon,
+.card-soon:hover,
+.card-soon:focus-within {
+  display: grid;
+  place-items: center;
+  min-height: 12rem;
+  border-style: dashed;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+.card-soon-text {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .footer {
   padding: 3rem 0 2rem;
   text-align: center;
@@ -604,6 +641,22 @@ a {
 .feedback-fab:hover {
   transform: rotate(30deg);
   box-shadow: 0 0 24px rgb(41 243 255 / 0.7);
+}
+/* Labelled pill on the home and game pages; the play page keeps the round button. */
+.feedback-pill {
+  width: auto;
+  height: auto;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  color: var(--cyan);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.feedback-pill:hover {
+  transform: none;
 }
 
 .fb-dialog {

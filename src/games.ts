@@ -10,6 +10,8 @@ export interface Game {
   repo?: string;
   /** Shown behind the card's info button. Cards without it get no button. */
   howItWasMade?: string;
+  minPlayers?: number;
+  maxPlayers?: number;
   /** Smallest viewport (CSS px) the game's portrait layout fits. Below it the play page scales the frame down. */
   minWidth?: number;
   minHeight?: number;
@@ -21,6 +23,10 @@ export interface Game {
 /** Min-size hints must be sane CSS pixel sizes; anything else is ignored so the play page defaults apply. */
 function minSize(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value >= 200 && value <= 4000 ? Math.round(value) : undefined;
+}
+
+function positiveInt(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : undefined;
 }
 
 /** Only allow https URLs so games.json can't inject javascript:/data: links. */
@@ -58,6 +64,8 @@ function parseGame(raw: unknown): Game | null {
     status: isNonEmptyString(r.status) ? r.status.toLowerCase() : 'live',
     repo: safeHttpsUrl(r.repo) ?? undefined,
     howItWasMade: isNonEmptyString(r.howItWasMade) ? r.howItWasMade.trim() : undefined,
+    minPlayers: positiveInt(r.minPlayers),
+    maxPlayers: positiveInt(r.maxPlayers),
     minWidth: minSize(r.minWidth),
     minHeight: minSize(r.minHeight),
     minWidthLandscape: minSize(r.minWidthLandscape),

@@ -231,8 +231,10 @@ const ORGANIZATION = {
 export function cardHtml(g, index) {
   const actions = [
     `<a class="btn btn-primary" href="${esc(playPath(g))}">Play here</a>`,
-    `<a class="btn btn-ghost" href="${esc(g.playUrl)}" target="_blank" rel="noopener">Play in browser ↗</a>`,
+    `<a class="btn btn-link" href="${esc(g.playUrl)}" target="_blank" rel="noopener">Play in browser ↗</a>`,
   ];
+  const players = playersText(g);
+  const facts = players ? `<ul class="card-facts"><li>${esc(players)}</li></ul>` : '';
   if (g.repo) actions.push(`<a class="btn btn-link" href="${esc(g.repo)}" target="_blank" rel="noopener">Source</a>`);
   const id = esc(g.id);
   const info = g.howItWasMade
@@ -248,16 +250,20 @@ export function cardHtml(g, index) {
               <h3 class="card-title"><a href="${esc(gamePath(g))}">${esc(g.name)}</a></h3>${info}
             </div>
             <p class="card-desc">${esc(g.description)}</p>
+            ${facts}
             ${how}
             <div class="card-actions">${actions.join('')}</div>
           </div>
         </li>`;
 }
 
+/** Same markup as comingSoonCard() in src/home.ts. */
+const COMING_SOON_HTML = '<li class="card card-soon"><p class="card-soon-text">More games soon</p></li>';
+
 /** @param {Game[]} games */
 export function gridHtml(games) {
-  if (games.length === 0) return '<li class="empty">No games yet. Check back soon!</li>';
-  return games.map(cardHtml).join('\n        ');
+  const cards = games.length === 0 ? ['<li class="empty">No games yet. Check back soon!</li>'] : games.map(cardHtml);
+  return [...cards, COMING_SOON_HTML].join('\n        ');
 }
 
 /** @param {Game[]} games */
@@ -366,7 +372,7 @@ export function gamePageHtml(g) {
       <p class="tip">Tips keep the games free. <a class="btn btn-tip" href="${KOFI_URL}" target="_blank" rel="noopener">Support on Ko-fi</a></p>
       <p class="tip"><a class="btn btn-tip" href="${X_URL}" target="_blank" rel="noopener">Follow @ItsMeTrueG on X</a></p>
     </footer>
-    <button id="feedback" class="feedback-fab" type="button" aria-label="Report a bug or add suggestions"><span aria-hidden="true">⚙️</span></button>
+    <button id="feedback" class="feedback-fab feedback-pill" type="button" aria-label="Feedback: report a bug or add suggestions">Feedback</button>
     <script type="module" src="/src/game-page.ts"></script>
   </body>
 </html>

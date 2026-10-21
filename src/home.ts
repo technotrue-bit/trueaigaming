@@ -28,11 +28,13 @@ function card(game: Game, index: number): HTMLLIElement {
     'div',
     { class: 'card-actions' },
     el('a', { class: 'btn btn-primary', href: `/play.html?id=${encodeURIComponent(game.id)}` }, 'Play here'),
-    el('a', { class: 'btn btn-ghost', href: game.playUrl, target: '_blank', rel: 'noopener' }, 'Play in browser ↗'),
+    el('a', { class: 'btn btn-link', href: game.playUrl, target: '_blank', rel: 'noopener' }, 'Play in browser ↗'),
   );
   if (game.repo) {
     actions.append(el('a', { class: 'btn btn-link', href: game.repo, target: '_blank', rel: 'noopener' }, 'Source'));
   }
+  const players = playersText(game);
+  const facts = players ? el('ul', { class: 'card-facts' }, el('li', {}, players)) : null;
 
   const head = el('div', { class: 'card-head' }, el('h3', { class: 'card-title' }, el('a', { href: `/games/${encodeURIComponent(game.id)}/` }, game.name)));
   const how = game.howItWasMade ? el('div', { class: 'card-how', id: `how-${game.id}`, hidden: '' }, el('p', {}, game.howItWasMade)) : null;
@@ -50,8 +52,21 @@ function card(game: Game, index: number): HTMLLIElement {
     'li',
     { class: 'card' },
     cover,
-    el('div', { class: 'card-body' }, head, el('p', { class: 'card-desc' }, game.description), ...(how ? [how] : []), actions),
+    el('div', { class: 'card-body' }, head, el('p', { class: 'card-desc' }, game.description), ...(facts ? [facts] : []), ...(how ? [how] : []), actions),
   );
+}
+
+/** Same markup as COMING_SOON_HTML in scripts/seo.mjs. */
+function comingSoonCard(): HTMLLIElement {
+  return el('li', { class: 'card card-soon' }, el('p', { class: 'card-soon-text' }, 'More games soon'));
+}
+
+/** Players shown on the card, e.g. "1–4 players". Matches playersText() in scripts/seo.mjs. */
+function playersText(game: Game): string {
+  const { minPlayers: min, maxPlayers: max } = game;
+  if (!max) return '';
+  if (!min || min === max) return `${max} ${max === 1 ? 'player' : 'players'}`;
+  return `${min}–${max} players`;
 }
 
 // Info button: show or hide the card's "How it was made" panel.
@@ -66,7 +81,7 @@ grid.addEventListener('click', (event) => {
 
 try {
   const games = await loadGames();
-  grid.replaceChildren(...games.map(card));
+  grid.replaceChildren(...games.map(card), comingSoonCard());
   count.textContent = `${games.length} ${games.length === 1 ? 'game' : 'games'} ready to play`;
   if (games.length === 0) grid.append(el('li', { class: 'empty' }, 'No games yet. Check back soon!'));
 } catch (err) {
