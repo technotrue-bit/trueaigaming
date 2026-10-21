@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && tsc -p api && vite build",
     "preview": "vite preview",
-    "test": "node --test scripts/kofi.test.mjs scripts/cards.test.mjs",
+    "test": "node --test scripts/kofi.test.mjs scripts/cards.test.mjs scripts/submission-rules.test.mjs",
     "thumb": "node scripts/thumb.mjs"
   },
   "devDependencies": {
