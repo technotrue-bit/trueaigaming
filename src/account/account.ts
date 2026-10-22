@@ -242,11 +242,8 @@ function wire(): void {
       // even when the server sign-out fails, and then returns that error. Show it after route() has run.
       const { error } = await supabase.auth.signOut({ scope: 'local' });
       await route();
-      if (error) {
-        showNotice(FALLBACK);
-        return;
-      }
-      showNotice('Your account and games were deleted.');
+      // Same check as the password path: a route() error keeps its Try again button and is not overwritten.
+      if (notice.hidden) showNotice(error ? FALLBACK : 'Your account and games were deleted.');
     });
   });
 
@@ -284,8 +281,8 @@ function wire(): void {
       if (error) throw error;
       recovering = false;
       await route();
-      // route() clears the notice and the panel messages, so this line goes last.
-      showNotice('Password updated.');
+      // route() clears the notice on success. Show this line only when no route() error is showing.
+      if (notice.hidden) showNotice('Password updated.');
     });
   });
 
@@ -298,6 +295,11 @@ if (!SUBMISSIONS_ENABLED) {
 } else {
   pageHead.hidden = false;
   showNotice(LOADING);
-  wire();
+  try {
+    wire();
+  } catch {
+    // The Supabase client throws on first use when its settings are missing. The fixed text and Try again show instead.
+    showNotice(FALLBACK, true);
+  }
   void route();
 }
