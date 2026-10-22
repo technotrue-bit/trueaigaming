@@ -24,6 +24,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const MAX_THUMBNAIL_BYTES = 1_048_576;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const UNIQUE_VIOLATION = '23505';
+const RAISE_EXCEPTION = 'P0001';
+const CHECK_VIOLATION = '23514';
+const PENDING_LIMIT_TEXT = 'You can have 5 pending submissions at a time';
+const DAILY_LIMIT_TEXT = 'You can add 3 new submissions per day';
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const DECLARED_TYPES = /** @type {Map<string, 'png' | 'jpg' | 'webp'>} */ (new Map([
   ['image/png', 'png'],
@@ -44,6 +48,22 @@ function fail(status, error) {
 /** @param {unknown} err */
 function isUniqueViolation(err) {
   return typeof err === 'object' && err !== null && /** @type {{ code?: unknown }} */ (err).code === UNIQUE_VIOLATION;
+}
+
+/**
+ * Maps a database error from a write to a client failure, or null when it is not one of the known cases. The
+ * limit triggers raise P0001 with the message pending_limit or daily_limit, and a check constraint gives 23514.
+ * Only fixed texts come back, never the database's message or detail.
+ * @param {unknown} err
+ * @returns {{ ok: false, status: number, error: string } | null}
+ */
+function databaseFailure(err) {
+  if (typeof err !== 'object' || err === null) return null;
+  const { code, message } = /** @type {{ code?: unknown, message?: unknown }} */ (err);
+  if (code === RAISE_EXCEPTION && message === 'pending_limit') return fail(429, PENDING_LIMIT_TEXT);
+  if (code === RAISE_EXCEPTION && message === 'daily_limit') return fail(429, DAILY_LIMIT_TEXT);
+  if (code === CHECK_VIOLATION) return fail(400, 'Those game details were not accepted.');
+  return null;
 }
 
 /** @param {number} ms */
@@ -140,10 +160,10 @@ async function runRebuild(rebuild) {
  */
 export async function createSubmission({ store, ownerId, input, now }) {
   if ((await store.countPending(ownerId)) >= MAX_PENDING) {
-    return fail(429, 'You can have 5 pending submissions at a time');
+    return fail(429, PENDING_LIMIT_TEXT);
   }
   if ((await store.countSince(ownerId, iso(now - DAY_MS))) >= MAX_PER_DAY) {
-    return fail(429, 'You can add 3 new submissions per day');
+    return fail(429, DAILY_LIMIT_TEXT);
   }
 
   const checked = validateSubmission(input);
@@ -159,6 +179,8 @@ export async function createSubmission({ store, ownerId, input, now }) {
     return { ok: true, value: submission };
   } catch (err) {
     if (isUniqueViolation(err)) return fail(409, 'That game address is taken');
+    const limited = databaseFailure(err);
+    if (limited) return limited;
     throw err;
   }
 }
@@ -192,7 +214,7 @@ export async function updateSubmission({ store, ownerId, id, input, now, rebuild
 
   // Editing sets the row back to pending, so it counts against the pending cap as a create does.
   if (current.status !== 'pending' && (await store.countPending(ownerId)) >= MAX_PENDING) {
-    return fail(429, 'You can have 5 pending submissions at a time');
+    return fail(429, PENDING_LIMIT_TEXT);
   }
 
   const wasApproved = current.status === 'approved';
@@ -207,6 +229,8 @@ export async function updateSubmission({ store, ownerId, id, input, now, rebuild
     });
   } catch (err) {
     if (isUniqueViolation(err)) return fail(409, 'That game address is taken');
+    const limited = databaseFailure(err);
+    if (limited) return limited;
     throw err;
   }
 

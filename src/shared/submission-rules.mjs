@@ -30,7 +30,8 @@ export const RESERVED_HANDLES = new Set([
 const HANDLE_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
 const SLUG_RE = /^[a-z0-9-]+$/;
 const IPV4_RE = /^\d{1,3}(\.\d{1,3}){3}$/;
-const BLOB_HOST_SUFFIX = '.public.blob.vercel-storage.com';
+// The same rule as the database check on submissions.thumbnail_url: one lowercase alphanumeric label, no port or userinfo.
+const BLOB_URL_RE = /^https:\/\/[a-z0-9-]+\.public\.blob\.vercel-storage\.com\//;
 const MAX_URL = 2048;
 const MAX_SLUG = 60;
 
@@ -202,15 +203,16 @@ export function validatePlayers(min, max) {
 }
 
 /**
- * True when the value is an https URL whose host ends with .public.blob.vercel-storage.com.
+ * True when the canonical form of the value (from the URL parser) matches the database rule: https, one
+ * [a-z0-9-] label before .public.blob.vercel-storage.com, no port or credentials, and at most 2048 characters.
  * @param {unknown} value
  * @returns {boolean}
  */
 export function isBlobThumbnailUrl(value) {
   if (typeof value !== 'string') return false;
   try {
-    const url = new URL(value);
-    return url.protocol === 'https:' && url.hostname.endsWith(BLOB_HOST_SUFFIX);
+    const href = new URL(value).href;
+    return href.length <= MAX_URL && BLOB_URL_RE.test(href);
   } catch {
     return false;
   }

@@ -13,6 +13,9 @@ import { randomUUID } from 'node:crypto';
  * @typedef {object} Seed
  * @property {Array<Partial<Profile> & Pick<Profile, 'id' | 'handle'>>} [profiles]
  * @property {Array<Partial<Submission> & Pick<Submission, 'id' | 'owner_id' | 'slug'>>} [submissions]
+ * @property {{ insertSubmission?: unknown, updateSubmission?: unknown }} [failures] An error to throw from
+ *   insertSubmission or updateSubmission before anything changes, as the database does when a limit trigger or a
+ *   check constraint fires. Tests may also set `store.failures` later.
  */
 
 /** A unique-key failure, with the same code Postgres gives. @param {string} table */
@@ -75,7 +78,7 @@ function oldestFirst(rows) {
 
 /**
  * @param {Seed} [seed]
- * @returns {Store & { state: { profiles: Map<string, Profile>, submissions: Map<string, Submission>, deletedAuthUsers: string[] } }}
+ * @returns {Store & { state: { profiles: Map<string, Profile>, submissions: Map<string, Submission>, deletedAuthUsers: string[] }, failures: { insertSubmission?: unknown, updateSubmission?: unknown } }}
  */
 export function createTestStore(seed = {}) {
   /** @type {{ profiles: Map<string, Profile>, submissions: Map<string, Submission>, deletedAuthUsers: string[] }} */
@@ -102,8 +105,11 @@ export function createTestStore(seed = {}) {
   const slugTaken = (slug, exceptId) =>
     [...state.submissions.values()].some((s) => s.slug === slug && s.id !== exceptId);
 
+  const failures = { ...seed.failures };
+
   return {
     state,
+    failures,
 
     async getProfile(userId) {
       return copyOrNull(state.profiles.get(userId));
@@ -156,6 +162,7 @@ export function createTestStore(seed = {}) {
     },
 
     async insertSubmission(row) {
+      if (failures.insertSubmission !== undefined) throw failures.insertSubmission;
       if (row.id !== undefined && state.submissions.has(row.id)) throw uniqueViolation('submissions');
       if (slugTaken(row.slug)) throw uniqueViolation('submissions');
       const submission = { ...submissionDefaults(), ...row, id: row.id ?? randomUUID() };
@@ -164,6 +171,7 @@ export function createTestStore(seed = {}) {
     },
 
     async updateSubmission(id, patch) {
+      if (failures.updateSubmission !== undefined) throw failures.updateSubmission;
       const current = state.submissions.get(id);
       if (!current) throw notFound();
       if (patch.slug !== undefined && slugTaken(patch.slug, id)) throw uniqueViolation('submissions');

@@ -276,3 +276,25 @@ test('failed results have the { ok: false, error: string } shape', () => {
   assert.equal(r.ok, false);
   assert.equal(typeof r.error, 'string');
 });
+
+// ---------- Blob thumbnails: the same rule as the database constraint ----------
+
+test('blob thumbnail: hosts the database constraint rejects are refused', () => {
+  assert.equal(isBlobThumbnailUrl('https://a.b.public.blob.vercel-storage.com/x.png'), false);
+  assert.equal(isBlobThumbnailUrl('https://a_b.public.blob.vercel-storage.com/x.png'), false);
+  assert.equal(isBlobThumbnailUrl('https://abc.public.blob.vercel-storage.com:8443/x.png'), false);
+  assert.equal(isBlobThumbnailUrl('https://user:pw@abc.public.blob.vercel-storage.com/x.png'), false);
+});
+
+test('blob thumbnail: a single-label alphanumeric store id is accepted, and the length cap is 2048', () => {
+  assert.equal(isBlobThumbnailUrl('https://abc123.public.blob.vercel-storage.com/x.png'), true);
+  const prefix = 'https://abc.public.blob.vercel-storage.com/';
+  assert.equal(isBlobThumbnailUrl(prefix + 'a'.repeat(2048 - prefix.length)), true);
+  assert.equal(isBlobThumbnailUrl(prefix + 'a'.repeat(2049 - prefix.length)), false);
+});
+
+test('submission returns the canonical thumbnail href', () => {
+  const r = validateSubmission(withFields({ thumbnailUrl: '  HTTPS://ABC.Public.Blob.Vercel-Storage.com/a b.png  ' }));
+  assert.equal(r.ok, true);
+  assert.equal(r.value.thumbnailUrl, 'https://abc.public.blob.vercel-storage.com/a%20b.png');
+});

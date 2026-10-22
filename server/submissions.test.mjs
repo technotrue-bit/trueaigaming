@@ -400,3 +400,71 @@ test('a rebuild that returns ok: false is logged on the server', async (t) => {
   assert.deepEqual(result.value.rebuild, { ok: false, error: 'Rebuild did not start' });
   assert.equal(logs.mock.calls.some((c) => c.arguments.includes('Rebuild hook returned 500')), true);
 });
+
+// ---------- Database limit errors (the database is the authority when two requests race) ----------
+
+/** An error shaped like the one the Supabase store raises. */
+const dbError = (code, message) => Object.assign(new Error(message), { code });
+
+test('db limit: P0001 pending_limit on insert gives the 429 text and creates nothing', async () => {
+  const store = createTestStore({ failures: { insertSubmission: dbError('P0001', 'pending_limit') } });
+  const result = await createSubmission({ store, ownerId: OWNER, input: input(), now: NOW });
+  assert.deepEqual(result, { ok: false, status: 429, error: 'You can have 5 pending submissions at a time' });
+  assert.equal(store.state.submissions.size, 0);
+});
+
+test('db limit: P0001 daily_limit on insert gives the 429 text', async () => {
+  const store = createTestStore({ failures: { insertSubmission: dbError('P0001', 'daily_limit') } });
+  const result = await createSubmission({ store, ownerId: OWNER, input: input(), now: NOW });
+  assert.deepEqual(result, { ok: false, status: 429, error: 'You can add 3 new submissions per day' });
+  assert.equal(store.state.submissions.size, 0);
+});
+
+test('db limit: P0001 pending_limit on an update that makes a row pending gives the 429 text and leaves the row unchanged', async () => {
+  const store = createTestStore({
+    submissions: [seed({ status: 'rejected', review_note: 'Describe it' })],
+    failures: { updateSubmission: dbError('P0001', 'pending_limit') },
+  });
+  const before = { ...store.state.submissions.get(ID(1)) };
+  const spy = rebuildSpy();
+  const result = await updateSubmission({ store, ownerId: OWNER, id: ID(1), input: input({ name: 'Changed' }), now: NOW, rebuild: spy.rebuild });
+  assert.deepEqual(result, { ok: false, status: 429, error: 'You can have 5 pending submissions at a time' });
+  assert.deepEqual(store.state.submissions.get(ID(1)), before);
+  assert.equal(spy.calls.length, 0);
+});
+
+test('db limit: P0001 daily_limit on update gives the 429 text', async () => {
+  const store = createTestStore({
+    submissions: [seed()],
+    failures: { updateSubmission: dbError('P0001', 'daily_limit') },
+  });
+  const result = await updateSubmission({ store, ownerId: OWNER, id: ID(1), input: input(), now: NOW, rebuild: rebuildSpy().rebuild });
+  assert.deepEqual(result, { ok: false, status: 429, error: 'You can add 3 new submissions per day' });
+});
+
+test('db limit: 23514 gives the fixed 400 text and never the database message', async () => {
+  const secret = 'new row for relation "submissions" violates check constraint "thumbnail_url_blob"';
+  const insertStore = createTestStore({ failures: { insertSubmission: dbError('23514', secret) } });
+  const created = await createSubmission({ store: insertStore, ownerId: OWNER, input: input(), now: NOW });
+  assert.deepEqual(created, { ok: false, status: 400, error: 'Those game details were not accepted.' });
+  assert.equal(JSON.stringify(created).includes('violates'), false);
+  assert.equal(insertStore.state.submissions.size, 0);
+
+  const updateStore = createTestStore({ submissions: [seed()], failures: { updateSubmission: dbError('23514', secret) } });
+  const updated = await updateSubmission({ store: updateStore, ownerId: OWNER, id: ID(1), input: input(), now: NOW, rebuild: rebuildSpy().rebuild });
+  assert.deepEqual(updated, { ok: false, status: 400, error: 'Those game details were not accepted.' });
+  assert.equal(JSON.stringify(updated).includes('violates'), false);
+});
+
+test('db limit: an unrelated error, or P0001 with another message, is rethrown unchanged', async () => {
+  const boom = dbError('XX000', 'connection lost');
+  const insertStore = createTestStore({ failures: { insertSubmission: boom } });
+  await assert.rejects(createSubmission({ store: insertStore, ownerId: OWNER, input: input(), now: NOW }), (err) => err === boom);
+
+  const other = dbError('P0001', 'something_else');
+  const updateStore = createTestStore({ submissions: [seed()], failures: { updateSubmission: other } });
+  await assert.rejects(
+    updateSubmission({ store: updateStore, ownerId: OWNER, id: ID(1), input: input(), now: NOW, rebuild: rebuildSpy().rebuild }),
+    (err) => err === other,
+  );
+});
