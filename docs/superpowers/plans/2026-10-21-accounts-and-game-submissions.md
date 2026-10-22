@@ -415,7 +415,7 @@ git commit -m "Add admin review and republish routes"
   - Otherwise it needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Missing either throws `'SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required when SUBMISSIONS_ENABLED=true'`.
   - A slug in `existingIds` throws `'Submission slug "<slug>" collides with a games.json id'`.
   - A row that fails `validateSubmission` throws. The build must not silently drop a game.
-- Default `fetchRows` uses `@supabase/supabase-js` to select approved rows with `profiles(handle, display_name)`.
+- Default `fetchRows` uses `@supabase/supabase-js` to select approved rows with `profiles!submissions_owner_id_fkey(handle, display_name)`.
 
 - [ ] **Step 1: Create the placeholder thumbnail**
 
