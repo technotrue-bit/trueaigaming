@@ -60,6 +60,22 @@ test('listPending returns only pending rows, oldest first, to an admin', async (
   assert.deepEqual(result.value.map((s) => s.id), [ID(1), ID(2)]);
 });
 
+test('listPending gives each row its owner handle, or null when the owner has no profile', async () => {
+  const store = createTestStore({
+    profiles: [
+      { id: ADMIN, handle: 'admin', is_admin: true },
+      { id: MEMBER, handle: 'member', is_admin: false },
+    ],
+    submissions: [
+      pendingRow({ id: ID(1), owner_id: MEMBER, slug: 'member-game', created_at: '2026-10-20T10:00:00.000Z' }),
+      pendingRow({ id: ID(2), owner_id: 'no-profile', slug: 'orphan-game', created_at: '2026-10-21T10:00:00.000Z' }),
+    ],
+  });
+  const result = await listPending({ store, adminId: ADMIN });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.value.map((s) => s.owner_handle), ['member', null]);
+});
+
 test('reject without a note returns 400 and changes nothing', async () => {
   const store = storeWith();
   const spy = rebuildSpy();

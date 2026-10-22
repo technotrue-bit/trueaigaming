@@ -5,6 +5,10 @@
 // The service-role client bypasses row-level security, so the logic checks ownership itself.
 
 /**
+ * @typedef {Submission & { owner_handle: string | null }} PendingSubmission
+ */
+
+/**
  * @typedef {object} Profile
  * @property {string} id
  * @property {string} handle
@@ -55,7 +59,7 @@
  * @property {(id: string, patch: Partial<Submission>) => Promise<Submission>} updateSubmission
  * @property {(id: string, expectedStatus: Submission['status'], patch: Partial<Submission>) => Promise<Submission | null>} updateSubmissionIfStatus Updates only a row whose status is expectedStatus. Returns null when no row matched.
  * @property {(id: string) => Promise<void>} deleteSubmission
- * @property {() => Promise<Submission[]>} listPending
+ * @property {() => Promise<PendingSubmission[]>} listPending
  * @property {() => Promise<Submission[]>} listApproved
  * @property {(id: string) => Promise<Submission | null>} getSubmissionById
  */
@@ -87,6 +91,17 @@ function toError(error) {
 function unwrap({ data, error }) {
   if (error) throw toError(error);
   return data;
+}
+
+/**
+ * A pending row with its owner's handle. The embedded profiles object is removed, so no other profile field reaches the
+ * caller. A row with no profile gets null.
+ * @param {Submission & { profiles?: { handle?: string | null } | null }} row
+ * @returns {PendingSubmission}
+ */
+function pendingRow(row) {
+  const { profiles, ...submission } = row;
+  return { ...submission, owner_handle: profiles?.handle ?? null };
 }
 
 /**
@@ -168,7 +183,8 @@ export function createStore(client) {
     },
 
     async listPending() {
-      return unwrap(await submissions().select('*').eq('status', 'pending').order('created_at', { ascending: true })) ?? [];
+      const rows = unwrap(await submissions().select('*, profiles(handle)').eq('status', 'pending').order('created_at', { ascending: true })) ?? [];
+      return rows.map(pendingRow);
     },
 
     async listApproved() {

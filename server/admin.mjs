@@ -7,6 +7,7 @@ import { rebuildForClient } from './deploy.mjs';
 
 /**
  * @typedef {import('./store.mjs').Submission} Submission
+ * @typedef {import('./store.mjs').PendingSubmission} PendingSubmission
  * @typedef {import('./store.mjs').Store} Store
  * @typedef {{ ok: true } | { ok: false, error: string }} RebuildResult
  * @typedef {() => Promise<RebuildResult>} Rebuild
@@ -49,9 +50,9 @@ async function runRebuild(rebuild) {
 }
 
 /**
- * Lists the pending submissions, oldest first. Only an admin may read the queue.
+ * Lists the pending submissions, oldest first, each with its owner's handle (owner_handle, or null). Only an admin may read the queue.
  * @param {{ store: Store, adminId: string }} args
- * @returns {Promise<AdminResult<Submission[]>>}
+ * @returns {Promise<AdminResult<PendingSubmission[]>>}
  */
 export async function listPending({ store, adminId }) {
   if (!(await store.isAdmin(adminId))) return fail(403, NOT_ADMIN);

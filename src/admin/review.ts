@@ -6,7 +6,7 @@ import { isBlobThumbnailUrl, validateHttpsUrl } from '../shared/submission-rules
 const CLOSED = 'Submissions are not open yet';
 const LOADING = 'Loading…';
 const FALLBACK = 'Something went wrong, try again.';
-const ADMINS_ONLY = 'Admins only.';
+const NO_HANDLE = 'No handle';
 const NEEDS_NOTE = 'Add a note to reject this game.';
 const APPROVED_LIVE = 'Live in a few minutes';
 const REBUILD_NOT_STARTED = 'Rebuild not started. Use Republish.';
@@ -17,10 +17,13 @@ const REPUBLISH_NOT_STARTED = 'Republish did not start. Try again.';
 const LIST_PATH = '/api/admin/submissions';
 const REPUBLISH_PATH = '/api/admin/republish';
 
-/** A game waiting for review, as GET /api/admin/submissions returns it. Only the fields this page shows are read. */
+/**
+ * A game waiting for review, as GET /api/admin/submissions returns it. Only the fields this page shows are read.
+ * owner_handle is the owner's handle, or null when the owner has no profile.
+ */
 interface PendingRow {
   id: string;
-  owner_id: string;
+  owner_handle: string | null;
   name: string;
   description: string;
   how_it_was_made: string;
@@ -89,11 +92,11 @@ function setStatus(out: HTMLElement, text: string, isError = false): void {
 }
 
 /**
- * An ApiError message is written for people to read, so it is shown as it is. A 403 is the admin gate, so it shows the
- * brief's wording. Anything else, such as a network failure or a missing-config error, gets the fixed text.
+ * An ApiError message is written for people to read, so it is shown as it is, a 403 included. Anything else, such as a
+ * network failure or a missing-config error, gets the fixed text.
  */
 function messageFor(err: unknown): string {
-  if (err instanceof ApiError) return err.status === 403 ? ADMINS_ONLY : err.message;
+  if (err instanceof ApiError) return err.message;
   return FALLBACK;
 }
 
@@ -187,7 +190,7 @@ function cardFor(row: PendingRow): HTMLLIElement {
     { class: 'review-card', 'data-id': id },
     ...(thumb ? [thumb] : []),
     el('h2', { class: 'review-name' }, row.name),
-    el('p', { class: 'review-owner' }, `Owner ID: ${row.owner_id}`),
+    el('p', { class: 'review-owner' }, row.owner_handle === null ? `Owner: ${NO_HANDLE}` : `Owner: ${row.owner_handle}`),
     el('p', { class: 'review-description' }, row.description),
     el('h3', { class: 'review-subhead' }, 'How it was made'),
     el('p', { class: 'review-how' }, row.how_it_was_made),

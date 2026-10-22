@@ -186,7 +186,11 @@ export function createTestStore(seed = {}) {
     },
 
     async listPending() {
-      return oldestFirst([...state.submissions.values()].filter((s) => s.status === 'pending').map((s) => ({ ...s })));
+      // Each row gets its owner's handle, or null when no profile has that owner id, as the store's embed does.
+      const withHandle = [...state.submissions.values()]
+        .filter((s) => s.status === 'pending')
+        .map((s) => ({ ...s, owner_handle: state.profiles.get(s.owner_id)?.handle ?? null }));
+      return oldestFirst(withHandle);
     },
 
     async listApproved() {
