@@ -1,0 +1,14 @@
+[
+  {
+    "slug": "super-star-party",
+    "name": "Fixture Game",
+    "description": "A small game used to check the build.",
+    "how_it_was_made": "Made with an AI assistant for a build check.",
+    "play_url": "https://play.example.com/fixture-game",
+    "source_url": "https://github.com/example/fixture-game",
+    "thumbnail_url": null,
+    "min_players": 1,
+    "max_players": 2,
+    "profiles": { "handle": "fixture-dev", "display_name": "Fixture Dev" }
+  }
+]
