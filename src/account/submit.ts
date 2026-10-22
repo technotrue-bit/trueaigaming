@@ -35,7 +35,6 @@ interface SubmissionReply {
 
 /** PATCH also says whether the site rebuild started. `null` means no rebuild was needed. */
 interface SaveReply extends SubmissionReply {
-  wasApproved: boolean;
   rebuild: { ok: boolean } | null;
 }
 
@@ -104,16 +103,20 @@ function messageFor(err: unknown): string {
   return err instanceof ApiError ? err.message : FALLBACK;
 }
 
-/** Runs one action from a button. The button is disabled while it runs. A failure shows in `out`. */
-async function attempt(control: HTMLButtonElement, out: HTMLElement, task: () => Promise<void>): Promise<void> {
+/**
+ * Runs one action from a button. The button is disabled while it runs. A failure shows in `out`. A task that resolves to
+ * true is leaving the page, so the button stays disabled and a second click cannot post the same body again.
+ */
+async function attempt(control: HTMLButtonElement, out: HTMLElement, task: () => Promise<boolean>): Promise<void> {
   control.disabled = true;
   setStatus(out, '');
+  let leaving = false;
   try {
-    await task();
+    leaving = (await task()) === true;
   } catch (err) {
     setStatus(out, messageFor(err), true);
   } finally {
-    control.disabled = false;
+    if (!leaving) control.disabled = false;
   }
 }
 
@@ -191,8 +194,11 @@ async function uploadThumbnail(file: File): Promise<string> {
   return reply.url;
 }
 
-/** Creates the game, or saves the edit. A newly picked thumbnail is uploaded first. */
-async function save(fields: SubmissionFields, file: File | null): Promise<void> {
+/**
+ * Creates the game, or saves the edit. A newly picked thumbnail is uploaded first. Resolves to true when the page is
+ * leaving after a create, so the caller keeps the button disabled.
+ */
+async function save(fields: SubmissionFields, file: File | null): Promise<boolean> {
   const thumbnailUrl = file ? await uploadThumbnail(file) : fields.thumbnailUrl;
   const body = JSON.stringify({
     name: fields.name,
@@ -209,7 +215,7 @@ async function save(fields: SubmissionFields, file: File | null): Promise<void> 
   if (editId === null) {
     await apiFetch<SubmissionReply>('/api/submissions', { method: 'POST', body });
     location.assign(CREATED_URL);
-    return;
+    return true;
   }
 
   const reply = await apiFetch<SaveReply>(`/api/submissions/${encodeURIComponent(editId)}`, { method: 'PATCH', body });
@@ -217,6 +223,7 @@ async function save(fields: SubmissionFields, file: File | null): Promise<void> 
   editNote.hidden = reply.submission.status !== 'approved';
   thumbnailInput.value = '';
   setStatus(submitStatus, reply.rebuild?.ok === false ? 'Saved, but the site did not update.' : 'Saved.');
+  return false;
 }
 
 /** Registers every form handler. None of them touch the Supabase client, so they are safe before the session loads. */
@@ -260,14 +267,16 @@ function wire(): void {
 if (!SUBMISSIONS_ENABLED) {
   showNotice(CLOSED);
 } else {
-  pageHead.hidden = false;
-  // Registered outside wire(), so Try again works even when wire() throws.
+  // Registered before any line that can throw, so Try again and the no-post guard exist even when a later line fails.
   retry.addEventListener('click', () => void route());
+  // The form never posts natively, so a failed wire() cannot lose typed values to a native post.
+  submitForm.addEventListener('submit', (event) => event.preventDefault());
   try {
     wire();
+    pageHead.hidden = false;
+    void route();
   } catch {
-    // A missing element would throw here. The fixed text and Try again show instead.
+    // A missing element in the markup lands here. The fixed text and Try again show, and route() does not run.
     showNotice(FALLBACK, true);
   }
-  void route();
 }
