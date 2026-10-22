@@ -124,4 +124,4 @@ Only the `VITE_` variables reach the browser (Vite inlines them at build time). 
 
 **`SUBMISSIONS_ENABLED`** is the launch switch. When it is not `true`, the account, submit, profile and admin pages show "Submissions are not open yet", the submission APIs answer 503, and the build lists no submitted games. Turn on `SUBMISSIONS_ENABLED` and `VITE_SUBMISSIONS_ENABLED` together, then redeploy. The build needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` when it is on, and fails if they are missing.
 
-Submitted thumbnails are uploaded to Vercel Blob, which also needs its usual token in the Vercel project.
+Submitted thumbnails are uploaded to Vercel Blob, which reads the `BLOB_READ_WRITE_TOKEN` variable (set when a Blob store is linked to the Vercel project). The feedback API uses it too.
