@@ -90,6 +90,8 @@ function showPlayer(profile: ProfileRow, games: GameRow[]): void {
  * shows the fixed text with Try again. The error itself is never shown or logged.
  */
 async function load(): Promise<void> {
+  // With the flag off, nothing is queried.
+  if (!SUBMISSIONS_ENABLED) return;
   setNotice(LOADING);
   hidePlayer();
   try {
@@ -123,13 +125,13 @@ async function load(): Promise<void> {
   }
 }
 
-// Handlers are registered before anything else that can throw.
-retry?.addEventListener('click', () => void load());
-
-// The flag is checked first. When it is off, the only thing shown is the notice.
+// The flag is checked first. When it is off, the only thing shown is the notice. The retry listener is registered in each
+// branch, before anything else in that branch that can throw.
 if (!SUBMISSIONS_ENABLED) {
+  retry?.addEventListener('click', () => void load());
   setNotice(CLOSED);
 } else {
+  retry?.addEventListener('click', () => void load());
   if (pageHead) pageHead.hidden = false;
   void load();
 }
