@@ -41,7 +41,10 @@ create table submissions (
     constraint submissions_play_url_check check (play_url ~ '^https://' and char_length(play_url) <= 2048),
   source_url text
     constraint submissions_source_url_check check (source_url ~ '^https://' and char_length(source_url) <= 2048),
-  thumbnail_url text,
+  thumbnail_url text
+    constraint submissions_thumbnail_url_check check (
+      thumbnail_url is null
+      or (thumbnail_url ~ '^https://[a-z0-9-]+\.public\.blob\.vercel-storage\.com/' and char_length(thumbnail_url) <= 2048)),
   min_players integer not null,
   max_players integer not null,
   status submission_status not null default 'pending',
@@ -56,9 +59,21 @@ create table submissions (
 create index submissions_owner_status_idx on submissions (owner_id, status);
 create index submissions_status_created_idx on submissions (status, created_at);
 
+-- Append-only record of every submission an owner created, for the daily cap. The cap counts this table, not
+-- submissions, so deleting a row and inserting another cannot beat it. Rows go only when the profile goes.
+-- Client roles have no access (row-level security on, no policies, no grants); the trigger below writes it.
+create table submission_creations (
+  owner_id uuid not null references profiles (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index submission_creations_owner_created_idx on submission_creations (owner_id, created_at);
+alter table submission_creations enable row level security;
+
 -- Keeps updated_at current on every update.
 create function set_updated_at() returns trigger
-language plpgsql as $$
+language plpgsql
+set search_path = pg_catalog
+as $$
 begin
   new.updated_at := now();
   return new;
@@ -72,6 +87,8 @@ create trigger submissions_set_updated_at
 -- Atomic caps. SECURITY DEFINER so the counts see every row of the owner whatever role runs the statement.
 -- pg_advisory_xact_lock serialises the owner's inserts and re-pendings until the transaction ends. The count
 -- runs after the lock is taken, in READ COMMITTED, so it sees rows the previous holder of the lock committed.
+-- This relies on READ COMMITTED, which is PostgREST's default. Under REPEATABLE READ or SERIALIZABLE the count
+-- would use a snapshot taken before the lock and the caps could be exceeded.
 create function enforce_submission_caps() returns trigger
 language plpgsql
 security definer
@@ -85,12 +102,14 @@ begin
        and (select count(*) from submissions where owner_id = new.owner_id and status = 'pending') >= 5 then
       raise exception 'pending_limit';
     end if;
-    if (select count(*) from submissions
+    if (select count(*) from submission_creations
           where owner_id = new.owner_id and created_at > now() - interval '24 hours') >= 3 then
       raise exception 'daily_limit';
     end if;
+    insert into submission_creations (owner_id, created_at) values (new.owner_id, new.created_at);
   else
-    -- UPDATE that moves a row to pending from another status. The row itself is not pending yet, so it is not counted.
+    -- UPDATE that moves a row to pending from another status, or to another owner while pending. The row is not
+    -- yet counted against new.owner_id, so it is not counted here.
     if (select count(*) from submissions where owner_id = new.owner_id and status = 'pending') >= 5 then
       raise exception 'pending_limit';
     end if;
@@ -100,7 +119,7 @@ begin
 end;
 $$;
 
-revoke all on function enforce_submission_caps() from public;
+revoke all on function enforce_submission_caps() from public, anon, authenticated, service_role;
 
 create trigger submissions_caps_insert
   before insert on submissions
@@ -109,7 +128,7 @@ create trigger submissions_caps_insert
 create trigger submissions_caps_to_pending
   before update on submissions
   for each row
-  when (new.status = 'pending' and old.status is distinct from new.status)
+  when (new.status = 'pending' and (old.status is distinct from new.status or old.owner_id is distinct from new.owner_id))
   execute function enforce_submission_caps();
 
 -- Row-level security.
@@ -119,6 +138,8 @@ alter table submissions enable row level security;
 -- Grants. Start from nothing for the client roles.
 revoke all on profiles from anon, authenticated;
 revoke all on submissions from anon, authenticated;
+revoke all on submission_creations from anon, authenticated, service_role;
+grant select on submission_creations to service_role;
 grant usage on schema public to anon, authenticated, service_role;
 grant all on profiles, submissions to service_role;
 
@@ -141,7 +162,9 @@ grant select (id, owner_id, slug, name, description, how_it_was_made, play_url, 
 -- A policy cannot hide columns. Granting review_note and reviewed_by to authenticated would let any signed-in user
 -- read them on APPROVED rows (reviewed_by would reveal who the admins are). So the owner reads the review
 -- columns of their own rows through this view instead. It runs with its owner's rights and filters on auth.uid().
-create view my_submissions as
+-- security_barrier keeps a caller's own filter functions from running on rows the view has not yet filtered out,
+-- so a cast in a caller's WHERE cannot leak another owner's review_note through an error message.
+create view my_submissions with (security_barrier = true) as
   select * from submissions where owner_id = auth.uid();
 revoke all on my_submissions from anon, authenticated;
 grant select on my_submissions to authenticated;

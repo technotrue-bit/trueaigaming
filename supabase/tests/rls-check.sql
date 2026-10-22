@@ -65,6 +65,17 @@ begin
 end;
 $$;
 
+-- A function that fails, quoting its argument, when it is handed another owner's review_note. Cost 0.0001 makes the
+-- planner want to run it before other conditions.
+create function t.leak(note text) returns boolean
+language plpgsql cost 0.0001 as $$
+begin
+  if note like 'not-a-number-%' then raise exception 'leaked: %', note; end if;
+  return true;
+end;
+$$;
+grant usage on schema t to authenticated;
+
 create function t.eq(label text, got bigint, want bigint) returns void
 language plpgsql as $$
 begin
@@ -160,6 +171,11 @@ begin
   perform t.expect('description 141 chars', 'postgres', null, format($q$update submissions set description = repeat('d', 141) where id = %L$q$, a_pending), '23514');
   perform t.expect('how_it_was_made 601 chars', 'postgres', null, format($q$update submissions set how_it_was_made = repeat('h', 601) where id = %L$q$, a_pending), '23514');
   perform t.exec('postgres', null, format($q$update submissions set description = repeat('d', 140), how_it_was_made = repeat('h', 600), name = repeat('n', 60) where id = %L$q$, a_pending));
+  perform t.expect('thumbnail other host', 'postgres', null, format($q$update submissions set thumbnail_url = 'https://evil.com/x.png' where id = %L$q$, a_pending), '23514');
+  perform t.expect('thumbnail http', 'postgres', null, format($q$update submissions set thumbnail_url = 'http://abc.public.blob.vercel-storage.com/x.png' where id = %L$q$, a_pending), '23514');
+  perform t.expect('thumbnail lookalike host', 'postgres', null, format($q$update submissions set thumbnail_url = 'https://abc.public.blob.vercel-storage.com.evil.com/x.png' where id = %L$q$, a_pending), '23514');
+  perform t.exec('postgres', null, format($q$update submissions set thumbnail_url = 'https://abc.public.blob.vercel-storage.com/x.png' where id = %L$q$, a_pending));
+  perform t.exec('postgres', null, format($q$update submissions set thumbnail_url = null where id = %L$q$, a_pending));
   perform t.expect('bad status', 'postgres', null, format($q$update submissions set status = 'maybe' where id = %L$q$, a_pending), '22P02');
 
   -- updated_at moves on every update.
@@ -212,7 +228,8 @@ begin
   perform t.eq('A inserts own pending', t.exec('authenticated', a,
     format($q$insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players) values (%L, 'a-second', 'n', 'd', 'h', 'https://x.com', 1, 2)$q$, a)), 1);
   perform t.eq('A deletes own row', t.exec('authenticated', a, $q$delete from submissions where slug = 'a-second'$q$), 1);
-  -- Duplicate slug through the client path is 23505 as well.
+  -- Duplicate slug through the client path is 23505 as well. A has 3 creations in 24 hours by now, so age them first.
+  update submission_creations set created_at = now() - interval '2 days' where owner_id = a;
   perform t.expect('A duplicate slug', 'authenticated', a,
     format($q$insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players) values (%L, 'b-pending', 'n', 'd', 'h', 'https://x.com', 1, 2)$q$, a), '23505');
 
@@ -312,9 +329,22 @@ begin
   perform t.expect('4th insert in 24 hours (rejected status)', 'service_role', null,
     format($q$insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players, status) values (%L, 'd-5', 'n', 'd', 'h', 'https://x.com', 1, 2, 'rejected')$q$, d), 'P0001', 'daily_limit');
   perform t.eq('daily count stays 3', (select count(*) from submissions where owner_id = d), 3);
-  -- Rows older than 24 hours do not count; deleting a row frees the slot.
-  update submissions set created_at = now() - interval '25 hours' where slug = 'd-1';
-  perform t.eq('insert allowed once a row is older than 24 hours', t.exec('authenticated', d, format(ins, d, 'd-4')), 1);
+  -- Deleting the rows does not free the slots: the cap counts creations, not surviving rows.
+  perform t.eq('owner deletes own rows', t.exec('authenticated', d, 'delete from submissions'), 3);
+  perform t.expect('delete then insert (authenticated)', 'authenticated', d, format(ins, d, 'd-4'), 'P0001', 'daily_limit');
+  perform t.expect('delete then insert (service_role)', 'service_role', null, format(ins, d, 'd-4'), 'P0001', 'daily_limit');
+  perform t.eq('creations kept after delete', (select count(*) from submission_creations where owner_id = d), 3);
+  -- The record is append-only and closed to clients.
+  perform t.expect('authenticated reads creations', 'authenticated', d, 'select * from submission_creations', '42501');
+  perform t.expect('anon reads creations', 'anon', null, 'select * from submission_creations', '42501');
+  perform t.expect('authenticated deletes creations', 'authenticated', d, 'delete from submission_creations', '42501');
+  perform t.expect('authenticated inserts creations', 'authenticated', d, format('insert into submission_creations (owner_id) values (%L)', d), '42501');
+  perform t.expect('service_role deletes creations', 'service_role', null, 'delete from submission_creations', '42501');
+  -- Creations older than 24 hours stop counting.
+  update submission_creations set created_at = now() - interval '25 hours'
+    where ctid = (select ctid from submission_creations where owner_id = d limit 1);
+  perform t.eq('insert allowed once a creation is older than 24 hours', t.exec('authenticated', d, format(ins, d, 'd-4')), 1);
+  perform t.expect('and the next one is refused again', 'authenticated', d, format(ins, d, 'd-5'), 'P0001', 'daily_limit');
 
   -- Editing an approved or rejected row back to pending is capped.
   for i in 1..5 loop perform t.sub(e, 'e-' || i, 'pending', interval '2 days'); end loop;
@@ -334,6 +364,69 @@ begin
 
   -- Caps are per owner: owner s is unaffected by the others.
   perform t.eq('other owner unaffected', t.exec('service_role', null, format(ins, s, 's-1')), 1);
+end;
+$$;
+
+-- More cap paths: multi-row inserts, moving a row to another owner, the function's privileges.
+do $$
+declare
+  m constant uuid := '22222222-0000-0000-0000-0000000000a1';  -- multi-row insert
+  src constant uuid := '22222222-0000-0000-0000-0000000000a2';  -- row moves away from here
+  dst constant uuid := '22222222-0000-0000-0000-0000000000a3';  -- and to here
+  v1 constant uuid := '22222222-0000-0000-0000-0000000000a4';  -- view barrier, caller
+  v2 constant uuid := '22222222-0000-0000-0000-0000000000a5';  -- view barrier, someone else
+  moving uuid;
+  i int;
+begin
+  insert into auth.users (id) values (m), (src), (dst), (v1), (v2);
+  insert into profiles (id, handle) values (m, 'cap-multi'), (src, 'cap-src'), (dst, 'cap-dst'), (v1, 'view-one'), (v2, 'view-two');
+
+  -- One INSERT ... SELECT that would pass the cap partway fails as a whole and inserts nothing.
+  for i in 1..3 loop perform t.sub(m, 'm-' || i, 'pending', interval '2 days'); end loop;
+  perform t.expect('multi-row insert over the pending cap', 'authenticated', m,
+    format($q$insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players)
+              select %L, 'm-new-' || g, 'n', 'd', 'h', 'https://x.com', 1, 2 from generate_series(1, 3) g$q$, m), 'P0001', 'pending_limit');
+  perform t.eq('nothing inserted', (select count(*) from submissions where owner_id = m), 3);
+  perform t.eq('no creations recorded', (select count(*) from submission_creations where owner_id = m and created_at > now() - interval '1 day'), 0);
+  perform t.expect('multi-row insert over the daily cap', 'service_role', null,
+    format($q$insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players, status)
+              select %L, 'm-rej-' || g, 'n', 'd', 'h', 'https://x.com', 1, 2, 'rejected' from generate_series(1, 4) g$q$, m), 'P0001', 'daily_limit');
+  perform t.eq('multi-row insert within the cap', t.exec('authenticated', m,
+    format($q$insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players)
+              select %L, 'm-ok-' || g, 'n', 'd', 'h', 'https://x.com', 1, 2 from generate_series(1, 2) g$q$, m)), 2);
+
+  -- Moving a pending row to an owner who is at the cap is refused. Moving to one below the cap works.
+  moving := t.sub(src, 'moving', 'pending', interval '2 days');
+  for i in 1..5 loop perform t.sub(dst, 'dst-' || i, 'pending', interval '2 days'); end loop;
+  perform t.expect('owner move at the pending cap', 'service_role', null,
+    format($q$update submissions set owner_id = %L where id = %L$q$, dst, moving), 'P0001', 'pending_limit');
+  perform t.eq('row stays with its owner', (select count(*) from submissions where id = moving and owner_id = src), 1);
+  delete from submissions where slug = 'dst-1';
+  perform t.eq('owner move below the cap', t.exec('service_role', null, format($q$update submissions set owner_id = %L where id = %L$q$, dst, moving)), 1);
+  perform t.eq('destination has 5 pending', (select count(*) from submissions where owner_id = dst and status = 'pending'), 5);
+
+  -- The view filters before the caller's own conditions run, so a cast in the caller's WHERE never sees another
+  -- owner's review_note. v2's notes are not numbers: if the cast ran on them the query would fail and quote one.
+  for i in 1..20 loop
+    perform t.sub(v2, 'v2-' || i, 'rejected', interval '2 days');
+  end loop;
+  update submissions set review_note = 'not-a-number-' || slug where owner_id = v2;
+  perform t.sub(v1, 'v1-a', 'rejected', interval '2 days');
+  update submissions set review_note = '42' where owner_id = v1;
+  -- A cheap function in the caller's WHERE is the planner's first choice to run early. It must still not see v2's rows.
+  perform t.eq('cheap function in WHERE returns only own rows', t.count('authenticated', v1, 'select 1 from my_submissions where t.leak(review_note)'), 1);
+  perform t.eq('cast in WHERE returns only own rows', t.count('authenticated', v1, 'select review_note from my_submissions where review_note::int > 0'), 1);
+  perform t.eq('view has security_barrier', (select count(*) from pg_class where oid = 'my_submissions'::regclass and 'security_barrier=true' = any (reloptions)), 1);
+
+  -- The cap function is not callable by any API role. It would be if the migration left the default grants in place.
+  perform t.eq('caps function not executable', (select count(*) from unnest(array['anon', 'authenticated', 'service_role', 'public']) as r
+    where has_function_privilege(r, 'enforce_submission_caps()', 'execute')), 0);
+  perform t.expect('call caps function as anon', 'anon', null, 'select enforce_submission_caps()', '42501');
+
+  -- The migration set search_path on both trigger functions.
+  perform t.eq('functions pin search_path', (select count(*) from pg_proc
+    where proname in ('set_updated_at', 'enforce_submission_caps') and pronamespace = 'public'::regnamespace
+      and exists (select 1 from unnest(proconfig) c where c like 'search_path=%')), 2);
 end;
 $$;
 

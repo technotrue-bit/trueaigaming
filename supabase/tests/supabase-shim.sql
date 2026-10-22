@@ -20,3 +20,5 @@ grant execute on function auth.uid() to anon, authenticated, service_role;
 -- Supabase grants every privilege on new public tables to the API roles by default. The migration has to undo that.
 grant usage on schema public to anon, authenticated, service_role;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+-- Supabase also grants execute on new public functions to the API roles. PostgreSQL grants it to PUBLIC as well.
+alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
