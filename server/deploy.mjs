@@ -26,6 +26,16 @@ export async function triggerRebuild({ hookUrl, fetchImpl = fetch }) {
   }
 }
 
+/**
+ * The rebuild a route passes to the logic. The route reads the hook URL from the environment and passes it here, so
+ * no route calls triggerRebuild itself. The logic runs the result through rebuildForClient.
+ * @param {string | undefined} hookUrl
+ * @returns {() => Promise<RebuildResult>}
+ */
+export function hookRebuild(hookUrl) {
+  return () => triggerRebuild({ hookUrl });
+}
+
 /** The only rebuild text a client sees. The reason goes to the log. */
 const REBUILD_NOT_STARTED = 'Rebuild did not start';
 

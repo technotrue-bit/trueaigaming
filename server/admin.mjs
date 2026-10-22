@@ -30,15 +30,21 @@ function notFound() {
   return { ok: false, status: 404, error: 'Not found' };
 }
 
+/** A row that is not pending cannot be reviewed. @returns {{ ok: false, status: 409, error: string }} */
+function notPending() {
+  return { ok: false, status: 409, error: 'Only pending submissions can be reviewed' };
+}
+
 /**
- * Runs the rebuild for a client reply. A failure becomes fixed text, and the reason is logged with an "admin:" prefix.
+ * Runs the rebuild for a client reply. A failure becomes fixed text. The log gets only the name of a thrown Error,
+ * or 'unknown error', because a thrown value can carry the hook URL in its message.
  * @param {Rebuild} rebuild
  * @returns {Promise<RebuildResult>}
  */
 async function runRebuild(rebuild) {
   return rebuildForClient({
     trigger: rebuild,
-    log: (message, detail) => console.error(`admin: ${message}`, detail),
+    log: (message, detail) => console.error(`admin: ${message}`, detail instanceof Error ? detail.name : 'unknown error'),
   });
 }
 
@@ -53,10 +59,11 @@ export async function listPending({ store, adminId }) {
 }
 
 /**
- * Approves or rejects a submission. Checks run in this order, and the admin check comes before any write: the
- * caller is an admin, the action is approve or reject, a reject has a note, and the id names a row. Then the
- * status, note, reviewer and review time are saved. Only an approval calls rebuild, after the save, so a failed
- * rebuild leaves the approval in place. A reject returns rebuild as null.
+ * Approves or rejects a pending submission. Checks run in this order, and the admin check comes before any write: the
+ * caller is an admin, the action is approve or reject, a reject has a note, the id names a row, and the row is
+ * pending. Then the status, note, reviewer and review time are saved, but only if the row is still pending, so a
+ * review that lands between the read and the write is refused with 409. Only an approval calls rebuild, after the
+ * save, so a failed rebuild leaves the approval in place. A reject returns rebuild as null.
  * @param {{ store: Store, adminId: string, id: unknown, action: unknown, note: unknown, rebuild: Rebuild }} args
  * @returns {Promise<AdminResult<{ submission: Submission, rebuild: RebuildResult | null }>>}
  */
@@ -70,13 +77,15 @@ export async function reviewSubmission({ store, adminId, id, action, note, rebui
   if (typeof id !== 'string' || !UUID.test(id)) return notFound();
   const current = await store.getSubmissionById(id);
   if (!current) return notFound();
+  if (current.status !== 'pending') return notPending();
 
-  const submission = await store.updateSubmission(id, {
+  const submission = await store.updateSubmissionIfStatus(id, 'pending', {
     status: action === 'approve' ? 'approved' : 'rejected',
     review_note: text === '' ? null : text,
     reviewed_by: adminId,
     reviewed_at: new Date().toISOString(),
   });
+  if (!submission) return notPending();
 
   const rebuildResult = action === 'approve' ? await runRebuild(rebuild) : null;
   return { ok: true, value: { submission, rebuild: rebuildResult } };

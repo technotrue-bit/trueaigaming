@@ -172,6 +172,15 @@ export function createTestStore(seed = {}) {
       return { ...next };
     },
 
+    async updateSubmissionIfStatus(id, expectedStatus, patch) {
+      const current = state.submissions.get(id);
+      if (!current || current.status !== expectedStatus) return null;
+      if (patch.slug !== undefined && slugTaken(patch.slug, id)) throw uniqueViolation('submissions');
+      const next = { ...current, ...patch, updated_at: now() };
+      state.submissions.set(id, next);
+      return { ...next };
+    },
+
     async deleteSubmission(id) {
       state.submissions.delete(id);
     },

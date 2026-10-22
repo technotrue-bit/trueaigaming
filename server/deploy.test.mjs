@@ -1,7 +1,7 @@
 // Rebuild trigger: a missing hook, a 2xx reply, an error reply, a network failure and a timeout. Fake fetch only. Run with `npm test`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rebuildForClient, triggerRebuild } from './deploy.mjs';
+import { hookRebuild, rebuildForClient, triggerRebuild } from './deploy.mjs';
 
 // A made-up hook. The last segment stands in for the secret token, which must never appear in an error.
 const hookUrl = 'https://api.vercel.com/v1/integrations/deploy/prj_test/secret-token-value';
@@ -119,4 +119,26 @@ test('rebuildForClient returns ok and logs nothing when the rebuild starts', asy
   const { logged, log } = recordingLog();
   assert.deepEqual(await rebuildForClient({ trigger: async () => ({ ok: true }), log }), { ok: true });
   assert.equal(logged.length, 0);
+});
+
+test('hookRebuild(url) returns a rebuild that POSTs to that URL through fetch', async (t) => {
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (input, init) => {
+    calls.push({ input, init });
+    return new Response(null, { status: 200 });
+  });
+  assert.deepEqual(await hookRebuild(hookUrl)(), { ok: true });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].input, hookUrl);
+  assert.equal(calls[0].init.method, 'POST');
+});
+
+test('hookRebuild with no URL reports the missing hook and does not call fetch', async (t) => {
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (input) => {
+    calls.push(input);
+    return new Response(null, { status: 200 });
+  });
+  assert.deepEqual(await hookRebuild(undefined)(), { ok: false, error: 'DEPLOY_HOOK_URL is not set' });
+  assert.equal(calls.length, 0);
 });

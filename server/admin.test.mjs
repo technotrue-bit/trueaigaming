@@ -143,14 +143,94 @@ test('reject sets the status, the note, the reviewer and the review time', async
   assert.equal(typeof row.reviewed_at, 'string');
 });
 
-test('a rebuild error reaches the result as fixed text only, and is logged', async (t) => {
+test('a rebuild error reaches the result as fixed text only, and is logged as unknown error', async (t) => {
   const logs = t.mock.method(console, 'error', () => {});
   const store = storeWith();
   const spy = rebuildSpy({ ok: false, error: 'DEPLOY_HOOK_URL is not set' });
   const result = await reviewSubmission({ store, adminId: ADMIN, id: ID(1), action: 'approve', note: '', rebuild: spy.rebuild });
   assert.deepEqual(result.value.rebuild, { ok: false, error: 'Rebuild did not start' });
   assert.equal(JSON.stringify(result).includes('DEPLOY_HOOK_URL'), false);
-  assert.equal(logs.mock.calls.some((c) => c.arguments.includes('DEPLOY_HOOK_URL is not set')), true);
+  assert.equal(logs.mock.calls.some((c) => c.arguments.includes('unknown error')), true);
+  assert.equal(JSON.stringify(logs.mock.calls).includes('DEPLOY_HOOK_URL'), false);
+});
+
+/** The fixed reply for a review of a row that is no longer pending. */
+const NOT_PENDING = { ok: false, status: 409, error: 'Only pending submissions can be reviewed' };
+
+/** A row an earlier admin already reviewed. A refused review must leave these fields as they are. */
+function reviewedRow(status) {
+  return pendingRow({ status, reviewed_by: 'earlier-admin', review_note: 'Earlier note', reviewed_at: '2026-10-21T09:00:00.000Z' });
+}
+
+/** The review fields of row 1, for comparing before and after a refused review. */
+function reviewFields(store) {
+  const row = store.state.submissions.get(ID(1));
+  return { status: row.status, review_note: row.review_note, reviewed_by: row.reviewed_by, reviewed_at: row.reviewed_at };
+}
+
+test('approve of an approved row returns 409, changes nothing and does not rebuild', async () => {
+  const store = storeWith([reviewedRow('approved')]);
+  const before = reviewFields(store);
+  const spy = rebuildSpy();
+  const result = await reviewSubmission({ store, adminId: ADMIN, id: ID(1), action: 'approve', note: '', rebuild: spy.rebuild });
+  assert.deepEqual(result, NOT_PENDING);
+  assert.deepEqual(reviewFields(store), before);
+  assert.equal(spy.calls.length, 0);
+});
+
+test('reject of an approved row returns 409, changes nothing and does not rebuild', async () => {
+  const store = storeWith([reviewedRow('approved')]);
+  const before = reviewFields(store);
+  const spy = rebuildSpy();
+  const result = await reviewSubmission({ store, adminId: ADMIN, id: ID(1), action: 'reject', note: 'Needs work', rebuild: spy.rebuild });
+  assert.deepEqual(result, NOT_PENDING);
+  assert.deepEqual(reviewFields(store), before);
+  assert.equal(spy.calls.length, 0);
+});
+
+test('approve of a rejected row returns 409, changes nothing and does not rebuild', async () => {
+  const store = storeWith([reviewedRow('rejected')]);
+  const before = reviewFields(store);
+  const spy = rebuildSpy();
+  const result = await reviewSubmission({ store, adminId: ADMIN, id: ID(1), action: 'approve', note: '', rebuild: spy.rebuild });
+  assert.deepEqual(result, NOT_PENDING);
+  assert.deepEqual(reviewFields(store), before);
+  assert.equal(spy.calls.length, 0);
+});
+
+test('a conditional write that matches no row returns 409 and does not rebuild', async () => {
+  const writes = [];
+  // The read sees a pending row. Another admin rejects it before this write, so the conditional write matches nothing.
+  const store = {
+    isAdmin: async () => true,
+    getSubmissionById: async () => pendingRow(),
+    updateSubmissionIfStatus: async (id, expectedStatus) => {
+      writes.push([id, expectedStatus]);
+      return null;
+    },
+  };
+  const spy = rebuildSpy();
+  const result = await reviewSubmission({ store, adminId: ADMIN, id: ID(1), action: 'approve', note: '', rebuild: spy.rebuild });
+  assert.deepEqual(result, NOT_PENDING);
+  assert.deepEqual(writes, [[ID(1), 'pending']]);
+  assert.equal(spy.calls.length, 0);
+});
+
+test('a thrown rebuild error is logged as its name only, never its message', async (t) => {
+  const logs = t.mock.method(console, 'error', () => {});
+  const store = storeWith();
+  const rebuild = async () => { throw new TypeError('connect failed at https://hook.example/secret-token'); };
+  const result = await reviewSubmission({ store, adminId: ADMIN, id: ID(1), action: 'approve', note: '', rebuild });
+  assert.deepEqual(result.value.rebuild, { ok: false, error: 'Rebuild did not start' });
+  assert.deepEqual(logs.mock.calls.map((c) => c.arguments), [['admin: rebuild threw', 'TypeError']]);
+});
+
+test('a thrown non-Error value is logged as unknown error, never its text', async (t) => {
+  const logs = t.mock.method(console, 'error', () => {});
+  const store = storeWith();
+  const rebuild = async () => { throw 'https://hook.example/secret-token'; };
+  await reviewSubmission({ store, adminId: ADMIN, id: ID(1), action: 'approve', note: '', rebuild });
+  assert.deepEqual(logs.mock.calls.map((c) => c.arguments), [['admin: rebuild threw', 'unknown error']]);
 });
 
 test('a rebuild that throws still saves the approval and reports fixed text', async (t) => {

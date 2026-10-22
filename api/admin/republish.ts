@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { republish } from '../../server/admin.mjs';
 import { requireUser } from '../../server/auth.mjs';
-import { triggerRebuild } from '../../server/deploy.mjs';
+import { hookRebuild } from '../../server/deploy.mjs';
 import { send } from '../../server/http.mjs';
 import { createStore } from '../../server/store.mjs';
 import { serviceClient } from '../../server/supabase.mjs';
@@ -29,7 +29,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const result = await republish({
       store,
       adminId: auth.user.id,
-      rebuild: () => triggerRebuild({ hookUrl: process.env.DEPLOY_HOOK_URL }),
+      rebuild: hookRebuild(process.env.DEPLOY_HOOK_URL),
     });
     if (!result.ok) return send(res, result.status, { ok: false, error: result.error });
     return send(res, 200, { ok: true, rebuild: result.value.rebuild });

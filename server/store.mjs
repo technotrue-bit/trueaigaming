@@ -53,6 +53,7 @@
  * @property {(ownerId: string, iso: string) => Promise<number>} countSince
  * @property {(row: NewSubmission) => Promise<Submission>} insertSubmission
  * @property {(id: string, patch: Partial<Submission>) => Promise<Submission>} updateSubmission
+ * @property {(id: string, expectedStatus: Submission['status'], patch: Partial<Submission>) => Promise<Submission | null>} updateSubmissionIfStatus Updates only a row whose status is expectedStatus. Returns null when no row matched.
  * @property {(id: string) => Promise<void>} deleteSubmission
  * @property {() => Promise<Submission[]>} listPending
  * @property {() => Promise<Submission[]>} listApproved
@@ -156,6 +157,10 @@ export function createStore(client) {
 
     async updateSubmission(id, patch) {
       return unwrap(await submissions().update(patch).eq('id', id).select('*').single());
+    },
+
+    async updateSubmissionIfStatus(id, expectedStatus, patch) {
+      return unwrap(await submissions().update(patch).eq('id', id).eq('status', expectedStatus).select('*').maybeSingle());
     },
 
     async deleteSubmission(id) {
