@@ -87,6 +87,7 @@ export default defineConfig(async () => {
           account: resolve(import.meta.dirname, 'account.html'),
           submit: resolve(import.meta.dirname, 'submit.html'),
           submissions: resolve(import.meta.dirname, 'submissions.html'),
+          admin: resolve(import.meta.dirname, 'admin.html'),
           ...writeGamePages(games),
         },
       },

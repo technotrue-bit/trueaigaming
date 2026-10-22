@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b0221" />
+    <title>Review games: TrueAIGaming</title>
+    <meta name="description" content="Review games submitted to TrueAIGaming." />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <style>
+      [hidden] {
+        display: none !important;
+      }
+      .review {
+        max-width: 36rem;
+        padding-block: 1.5rem 3rem;
+      }
+      .review-title {
+        margin: 0.5rem 0 1rem;
+        font-family: var(--font-display);
+        font-size: 2rem;
+        line-height: 1.2;
+      }
+      .review-back {
+        margin: 0;
+      }
+      .review-notice {
+        margin: 0 0 1rem;
+        font-weight: 700;
+      }
+      .review-tools {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.6rem 1rem;
+        margin: 0 0 0.5rem;
+      }
+      .review-status {
+        min-height: 1.5em;
+        margin: 0 0 0.5rem;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      .review-status.is-error {
+        color: #ff8a8a;
+      }
+      .review-empty {
+        margin: 0;
+        color: var(--muted);
+      }
+      .review-list {
+        display: grid;
+        gap: 1rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .review-card {
+        display: grid;
+        gap: 0.75rem;
+        padding: 1rem 1.25rem;
+        border: 2px solid rgb(41 243 255 / 0.4);
+        border-radius: var(--radius);
+        background: var(--panel);
+        overflow-wrap: anywhere;
+      }
+      .review-thumb {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 16 / 9;
+        object-fit: cover;
+        border-radius: 10px;
+        background: var(--bg);
+      }
+      .review-name {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 1.15rem;
+        line-height: 1.25;
+      }
+      .review-owner,
+      .review-description,
+      .review-missing {
+        margin: 0;
+      }
+      .review-owner,
+      .review-missing {
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      .review-subhead {
+        margin: 0.25rem 0 0;
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+      .review-how {
+        margin: 0;
+        white-space: pre-wrap;
+      }
+      .review-links,
+      .review-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+      }
+      .review-decision {
+        display: grid;
+        gap: 0.5rem;
+      }
+      .review-label {
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+      .review-note {
+        width: 100%;
+        padding: 0.55rem 0.7rem;
+        border: 1px solid rgb(185 166 221 / 0.5);
+        border-radius: 10px;
+        background: var(--bg);
+        color: var(--text);
+        font: inherit;
+        font-size: 1rem; /* 16px+ stops iOS zooming on focus */
+        resize: vertical;
+      }
+      .review .btn {
+        cursor: pointer;
+        font-family: inherit;
+      }
+      .review .btn-primary {
+        border: 0;
+      }
+      .review .btn-ghost {
+        background: transparent;
+      }
+      .review .btn-danger {
+        color: #ff8a8a;
+        border: 2px solid #ff8a8a;
+        background: transparent;
+      }
+      .review .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="review-page" class="wrap review">
+      <div id="page-head" hidden>
+        <p class="review-back"><a href="/account">Back to account</a></p>
+        <h1 class="review-title">Review games</h1>
+      </div>
+      <p id="notice" class="review-notice" role="status" aria-live="polite" hidden></p>
+      <button id="retry" class="btn btn-ghost" type="button" hidden>Try again</button>
+
+      <section id="review-body" aria-label="Games waiting for review" hidden>
+        <div class="review-tools">
+          <button id="republish-btn" class="btn btn-ghost" type="button">Republish</button>
+          <p id="republish-status" class="review-status" role="status" aria-live="polite"></p>
+        </div>
+        <p id="action-status" class="review-status" role="status" aria-live="polite"></p>
+        <p id="empty" class="review-empty" hidden>No games are waiting for review.</p>
+        <ul id="pending" class="review-list"></ul>
+      </section>
+    </main>
+    <script type="module" src="/src/admin/review.ts"></script>
+  </body>
+</html>
