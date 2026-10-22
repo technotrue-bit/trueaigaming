@@ -70,7 +70,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-src https://super-star-party.vercel.app https://*.vercel.app; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; object-src 'none'"
+          "value": "default-src 'self'; connect-src 'self' https://ycajnupfbiushygycclf.supabase.co; img-src 'self' data: https://*.public.blob.vercel-storage.com; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-src https://super-star-party.vercel.app https://*.vercel.app; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; object-src 'none'"
         },
         {
           "key": "X-Content-Type-Options",

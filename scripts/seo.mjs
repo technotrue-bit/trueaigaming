@@ -403,7 +403,8 @@ export function gamePageHtml(g) {
       </article>
     </main>
     <footer class="footer wrap">
-      <p>No accounts. Just games.</p>
+      <p>Free to play. Sign up to share your own game.</p>
+      <p><a href="/account">Sign in or share your game</a> &middot; <a href="/privacy.html">Privacy</a></p>
       <p class="tip">Tips keep the games free. <a class="btn btn-tip" href="${KOFI_URL}" target="_blank" rel="noopener">Support on Ko-fi</a></p>
       <p class="tip"><a class="btn btn-tip" href="${X_URL}" target="_blank" rel="noopener">Follow @ItsMeTrueG on X</a></p>
     </footer>
