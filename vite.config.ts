@@ -84,6 +84,7 @@ export default defineConfig(async () => {
         input: {
           main: resolve(import.meta.dirname, 'index.html'),
           play: resolve(import.meta.dirname, 'play.html'),
+          account: resolve(import.meta.dirname, 'account.html'),
           ...writeGamePages(games),
         },
       },
