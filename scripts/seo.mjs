@@ -33,6 +33,10 @@ export const PAGES_DIR = join(ROOT, 'games');
  * @property {string} [howItWasMade]
  * @property {number} [minPlayers]
  * @property {number} [maxPlayers]
+ * @property {number} [minWidth] Play-page minimum size (CSS px), 200 to 4000, same as src/games.ts. Used when the game is framed.
+ * @property {number} [minHeight]
+ * @property {number} [minWidthLandscape]
+ * @property {number} [minHeightLandscape]
  * @property {string} author
  * @property {boolean} [external] Submitted game hosted elsewhere: Play goes to playUrl in a new tab, never /play.html.
  */
@@ -91,6 +95,9 @@ const isNonEmptyString = (value) => typeof value === 'string' && value.trim() !=
 /** @param {unknown} value */
 const positiveInt = (value) => (Number.isInteger(value) && /** @type {number} */ (value) > 0 ? /** @type {number} */ (value) : undefined);
 
+/** Min-size hints must be sane CSS pixel sizes; anything else is ignored so the play page defaults apply. Same rule as src/games.ts. @param {unknown} value */
+const minSize = (value) => (typeof value === 'number' && Number.isFinite(value) && value >= 200 && value <= 4000 ? Math.round(value) : undefined);
+
 /** Real pixel size of a local PNG thumbnail (IHDR); other formats and remote thumbnails fall back to the documented 1280x720. @param {string} path */
 function imageSize(path) {
   const fallback = { width: 1280, height: 720 };
@@ -147,6 +154,10 @@ export function loadGames(file = join(ROOT, 'public/games.json')) {
       maxPlayers: maxPlayers && minPlayers && maxPlayers < minPlayers ? minPlayers : maxPlayers,
       author: isNonEmptyString(r.author) ? r.author.trim() : DEFAULT_AUTHOR,
       external: r.external === true ? true : undefined,
+      minWidth: minSize(r.minWidth),
+      minHeight: minSize(r.minHeight),
+      minWidthLandscape: minSize(r.minWidthLandscape),
+      minHeightLandscape: minSize(r.minHeightLandscape),
     });
   }
   return games;

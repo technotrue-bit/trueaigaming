@@ -170,3 +170,27 @@ test('home.ts and seo.mjs use the same external cover label suffix', () => {
   assert.ok(readFileSync(join(ROOT, 'src/home.ts'), 'utf8').includes(suffix));
   assert.ok(readFileSync(join(ROOT, 'scripts/seo.mjs'), 'utf8').includes(suffix));
 });
+
+test('loadGames keeps the four play-page min sizes, rounded to whole pixels', (t) => {
+  const warn = t.mock.method(console, 'warn', () => {});
+  const [game] = loadGames(
+    gamesFile(t, [{ ...entry, thumbnail: BLOB, minWidth: 360.4, minHeight: 600.6, minWidthLandscape: 640, minHeightLandscape: 360 }]),
+  );
+  assert.equal(game.minWidth, 360);
+  assert.equal(game.minHeight, 601);
+  assert.equal(game.minWidthLandscape, 640);
+  assert.equal(game.minHeightLandscape, 360);
+  assert.equal(warn.mock.callCount(), 0);
+});
+
+test('loadGames drops a min size outside 200 to 4000 or not a number, and keeps the bounds', (t) => {
+  const warn = t.mock.method(console, 'warn', () => {});
+  const [game] = loadGames(
+    gamesFile(t, [{ ...entry, thumbnail: BLOB, minWidth: 150, minHeight: 4001, minWidthLandscape: '640', minHeightLandscape: 200 }]),
+  );
+  assert.equal(game.minWidth, undefined);
+  assert.equal(game.minHeight, undefined);
+  assert.equal(game.minWidthLandscape, undefined);
+  assert.equal(game.minHeightLandscape, 200);
+  assert.equal(warn.mock.callCount(), 0);
+});
