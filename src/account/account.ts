@@ -286,7 +286,6 @@ function wire(): void {
     });
   });
 
-  retry.addEventListener('click', () => void route());
 }
 
 // The flag is checked before anything else. When it is off, the only thing shown is the notice.
@@ -295,6 +294,8 @@ if (!SUBMISSIONS_ENABLED) {
 } else {
   pageHead.hidden = false;
   showNotice(LOADING);
+  // Registered outside wire(), so Try again works even when wire() throws on a missing config.
+  retry.addEventListener('click', () => void route());
   try {
     wire();
   } catch {
