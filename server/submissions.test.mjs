@@ -185,24 +185,26 @@ test('deleting an approved submission still rebuilds when the delete commits and
   assert.equal(spy.calls.length, 1);
 });
 
-test('a rebuild that fails after an edit still saves the edit', async () => {
+test('a rebuild that fails after an edit still saves the edit', async (t) => {
+  t.mock.method(console, 'error', () => {});
   const store = createTestStore({ submissions: [seed({ status: 'approved' })] });
   const spy = rebuildSpy({ ok: false, error: 'Rebuild hook returned 500' });
   const result = await updateSubmission({ store, ownerId: OWNER, id: ID(1), input: input({ name: 'Edited' }), now: NOW, rebuild: spy.rebuild });
   assert.equal(result.ok, true);
-  assert.deepEqual(result.value.rebuild, { ok: false, error: 'Rebuild hook returned 500' });
+  assert.deepEqual(result.value.rebuild, { ok: false, error: 'Rebuild did not start' });
   assert.equal(store.state.submissions.get(ID(1)).name, 'Edited');
   assert.equal(store.state.submissions.get(ID(1)).status, 'pending');
 });
 
-test('a rebuild that throws after an edit still saves the edit', async () => {
+test('a rebuild that throws after an edit still saves the edit', async (t) => {
+  t.mock.method(console, 'error', () => {});
   const store = createTestStore({ submissions: [seed({ status: 'approved' })] });
   const result = await updateSubmission({
     store, ownerId: OWNER, id: ID(1), input: input({ name: 'Edited' }), now: NOW,
     rebuild: async () => { throw new Error('boom'); },
   });
   assert.equal(result.ok, true);
-  assert.deepEqual(result.value.rebuild, { ok: false, error: 'Rebuild failed' });
+  assert.deepEqual(result.value.rebuild, { ok: false, error: 'Rebuild did not start' });
   assert.equal(store.state.submissions.get(ID(1)).name, 'Edited');
 });
 
@@ -331,4 +333,70 @@ test('thumbnail: JPEG and WebP signatures must match their declared types', () =
   assert.equal(checkThumbnail(jpeg, 'image/png').status, 415);
   assert.equal(checkThumbnail(pngBytes(), 'image/jpeg').status, 415);
   assert.equal(checkThumbnail(pngBytes(), 'constructor').status, 415);
+});
+
+test('a failed rebuild gives the client a fixed message, and the config name never appears', async (t) => {
+  const logs = t.mock.method(console, 'error', () => {});
+  const store = createTestStore({ submissions: [seed({ status: 'approved' })] });
+  const spy = rebuildSpy({ ok: false, error: 'DEPLOY_HOOK_URL is not set' });
+  const result = await updateSubmission({ store, ownerId: OWNER, id: ID(1), input: input({ name: 'Edited' }), now: NOW, rebuild: spy.rebuild });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.value.rebuild, { ok: false, error: 'Rebuild did not start' });
+  assert.equal(JSON.stringify(result).includes('DEPLOY_HOOK_URL'), false);
+  // The reason is still logged on the server.
+  assert.equal(logs.mock.calls.some((c) => c.arguments.includes('DEPLOY_HOOK_URL is not set')), true);
+});
+
+test('editing a rejected submission when five are already pending is refused with 429', async () => {
+  const pending = [1, 2, 3, 4, 5].map((n) => seed({ id: ID(n), slug: `pending-${n}` }));
+  const rejected = seed({ id: ID(6), slug: 'rejected-one', status: 'rejected', review_note: 'Describe it' });
+  const store = createTestStore({ submissions: [...pending, rejected] });
+  const spy = rebuildSpy();
+  const result = await updateSubmission({ store, ownerId: OWNER, id: ID(6), input: input({ slug: 'rejected-one' }), now: NOW, rebuild: spy.rebuild });
+  assert.deepEqual(result, { ok: false, status: 429, error: 'You can have 5 pending submissions at a time' });
+  assert.equal(store.state.submissions.get(ID(6)).status, 'rejected');
+  assert.equal(store.state.submissions.get(ID(6)).review_note, 'Describe it');
+  assert.equal(spy.calls.length, 0);
+});
+
+test('the logic refuses another owner\'s row even when the store returns it', async () => {
+  const store = createTestStore({ submissions: [seed({ owner_id: OTHER, status: 'approved' })] });
+  // A store whose query ignores ownerId, so it returns the foreign row. Writes are counted.
+  store.getOwnSubmission = async (_ownerId, id) => {
+    const row = store.state.submissions.get(id);
+    return row ? { ...row } : null;
+  };
+  let writes = 0;
+  const { updateSubmission: write, deleteSubmission: remove } = store;
+  store.updateSubmission = async (...args) => { writes += 1; return write(...args); };
+  store.deleteSubmission = async (...args) => { writes += 1; return remove(...args); };
+  const spy = rebuildSpy();
+  assert.deepEqual(await getOwnSubmission({ store, ownerId: OWNER, id: ID(1) }), NOT_FOUND);
+  assert.deepEqual(
+    await updateSubmission({ store, ownerId: OWNER, id: ID(1), input: input({ name: 'Hijacked' }), now: NOW, rebuild: spy.rebuild }),
+    NOT_FOUND,
+  );
+  assert.deepEqual(await deleteSubmission({ store, ownerId: OWNER, id: ID(1), rebuild: spy.rebuild }), NOT_FOUND);
+  assert.equal(writes, 0);
+  assert.equal(store.state.submissions.get(ID(1)).name, 'Star Pie');
+  assert.equal(store.state.submissions.has(ID(1)), true);
+  assert.equal(spy.calls.length, 0);
+});
+
+test('a rebuild that throws is logged on the server with the error', async (t) => {
+  const logs = t.mock.method(console, 'error', () => {});
+  const store = createTestStore({ submissions: [seed({ status: 'approved' })] });
+  const boom = new Error('socket hang up');
+  const result = await deleteSubmission({ store, ownerId: OWNER, id: ID(1), rebuild: async () => { throw boom; } });
+  assert.deepEqual(result.value.rebuild, { ok: false, error: 'Rebuild did not start' });
+  assert.deepEqual(logs.mock.calls.map((c) => c.arguments), [['submissions: rebuild threw', boom]]);
+});
+
+test('a rebuild that returns ok: false is logged on the server', async (t) => {
+  const logs = t.mock.method(console, 'error', () => {});
+  const store = createTestStore({ submissions: [seed({ status: 'approved' })] });
+  const spy = rebuildSpy({ ok: false, error: 'Rebuild hook returned 500' });
+  const result = await deleteSubmission({ store, ownerId: OWNER, id: ID(1), rebuild: spy.rebuild });
+  assert.deepEqual(result.value.rebuild, { ok: false, error: 'Rebuild did not start' });
+  assert.equal(logs.mock.calls.some((c) => c.arguments.includes('Rebuild hook returned 500')), true);
 });

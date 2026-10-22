@@ -104,6 +104,8 @@ function columns(fields) {
 
 /**
  * The caller's own row, or null. A malformed id is null without asking the store, so it cannot reach the uuid column.
+ * The owner is checked here as well as in the store query, so a store that ignores ownerId cannot expose another
+ * owner's row.
  * @param {Store} store
  * @param {string} ownerId
  * @param {string} id
@@ -111,20 +113,31 @@ function columns(fields) {
  */
 async function ownedRow(store, ownerId, id) {
   if (typeof id !== 'string' || !UUID.test(id)) return null;
-  return store.getOwnSubmission(ownerId, id);
+  const row = await store.getOwnSubmission(ownerId, id);
+  return row && row.owner_id === ownerId ? row : null;
 }
 
+/** The only rebuild text a client sees. The reason goes to the server log. */
+const REBUILD_NOT_STARTED = 'Rebuild did not start';
+
 /**
- * Runs the rebuild. A rebuild that throws becomes a failed result, so the caller still reports the saved change.
+ * Runs the rebuild. A rebuild that throws or does not start becomes a failed result with fixed text, so the
+ * caller still reports the saved change and no config name or hook detail reaches the client. The reason is logged.
  * @param {Rebuild} rebuild
  * @returns {Promise<RebuildResult>}
  */
 async function runRebuild(rebuild) {
+  let result;
   try {
-    return await rebuild();
-  } catch {
-    return { ok: false, error: 'Rebuild failed' };
+    result = await rebuild();
+  } catch (err) {
+    console.error('submissions: rebuild threw', err);
+    return { ok: false, error: REBUILD_NOT_STARTED };
   }
+  if (result.ok) return { ok: true };
+  // The trigger's messages never include the hook URL, so they are safe to log.
+  console.error('submissions: rebuild did not start', result.error);
+  return { ok: false, error: REBUILD_NOT_STARTED };
 }
 
 /**
@@ -184,6 +197,11 @@ export async function updateSubmission({ store, ownerId, id, input, now, rebuild
   const fields = checked.value;
   if (fields.thumbnailUrl !== null && !isBlobThumbnailUrl(fields.thumbnailUrl)) {
     return fail(400, 'Thumbnail must be hosted on Vercel Blob');
+  }
+
+  // Editing sets the row back to pending, so it counts against the pending cap as a create does.
+  if (current.status !== 'pending' && (await store.countPending(ownerId)) >= MAX_PENDING) {
+    return fail(429, 'You can have 5 pending submissions at a time');
   }
 
   const wasApproved = current.status === 'approved';

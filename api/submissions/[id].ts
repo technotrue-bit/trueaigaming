@@ -44,7 +44,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     if (method === 'DELETE') {
       const result = await deleteSubmission({ store, ownerId: auth.user.id, id, rebuild });
       if (!result.ok) return send(res, result.status, { ok: false, error: result.error });
-      return send(res, 200, { ok: true, rebuild: result.value.rebuild });
+      return send(res, 200, { ok: true, wasApproved: result.value.wasApproved, rebuild: result.value.rebuild });
     }
 
     let body: unknown;
@@ -64,7 +64,12 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       rebuild,
     });
     if (!result.ok) return send(res, result.status, { ok: false, error: result.error });
-    return send(res, 200, { ok: true, submission: result.value.submission, rebuild: result.value.rebuild });
+    return send(res, 200, {
+      ok: true,
+      submission: result.value.submission,
+      wasApproved: result.value.wasApproved,
+      rebuild: result.value.rebuild,
+    });
   } catch (err) {
     console.error('submissions: request failed', err);
     return send(res, 500, { ok: false, error: 'Something went wrong, try again' });
