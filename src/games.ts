@@ -48,9 +48,12 @@ function safeLocalPath(value: unknown): string | null {
   return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : null;
 }
 
-/** Same-origin path, or an https Vercel Blob URL for submitted games (the CSP img-src must allow that host). */
+/** Same-origin path, or an https Vercel Blob URL without credentials, for submitted games (the CSP img-src must allow that host). */
 function safeThumbnail(value: unknown): string | null {
-  if (typeof value === 'string' && isBlobThumbnailUrl(value)) return new URL(value).href;
+  if (typeof value === 'string' && isBlobThumbnailUrl(value)) {
+    const url = new URL(value);
+    if (!url.username && !url.password) return url.href;
+  }
   return safeLocalPath(value);
 }
 

@@ -76,9 +76,12 @@ function safeLocalPath(value) {
   return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : null;
 }
 
-/** Same-origin path, or an https Vercel Blob URL for submitted games. Same rules as src/games.ts. @param {unknown} value */
+/** Same-origin path, or an https Vercel Blob URL without credentials, for submitted games. Same rules as src/games.ts. @param {unknown} value */
 function safeThumbnail(value) {
-  if (typeof value === 'string' && isBlobThumbnailUrl(value)) return new URL(value).href;
+  if (typeof value === 'string' && isBlobThumbnailUrl(value)) {
+    const url = new URL(value);
+    if (!url.username && !url.password) return url.href;
+  }
   return safeLocalPath(value);
 }
 
@@ -239,6 +242,9 @@ const ORGANIZATION = {
 /** Where Play goes: /play.html for hosted games, the game's own site in a new tab for external ones. @param {Game} g */
 const playAttrs = (g) => (g.external ? `href="${esc(g.playUrl)}" target="_blank" rel="noopener noreferrer"` : `href="${esc(playPath(g))}"`);
 
+/** Cover link label. An external cover says it opens a new tab. Same text as home.ts card(). @param {Game} g */
+const coverLabel = (g) => `Play ${esc(g.name)}${g.external ? ' (opens in a new tab)' : ''}`;
+
 /** Same markup and classes as card() in src/home.ts. @param {Game} g @param {number} index */
 export function cardHtml(g, index) {
   const actions = g.external
@@ -256,7 +262,7 @@ export function cardHtml(g, index) {
     : '';
   const how = g.howItWasMade ? `<div class="card-how" id="how-${id}" hidden><p>${esc(g.howItWasMade)}</p></div>` : '';
   return `<li class="card">
-          <a class="card-cover" ${playAttrs(g)} aria-label="Play ${esc(g.name)}">
+          <a class="card-cover" ${playAttrs(g)} aria-label="${coverLabel(g)}">
             <img src="${esc(g.thumbnail)}" alt="${esc(g.name)} screenshot" width="1280" height="720" decoding="async" loading="${index < 2 ? 'eager' : 'lazy'}" /><span class="${statusClass(g.status)}">${esc(g.status)}</span>
           </a>
           <div class="card-body">
@@ -369,7 +375,7 @@ export function gamePageHtml(g) {
     <main id="game" class="wrap gp-main">
       <a class="gp-back" href="/">← Back to all games</a>
       <article class="gp-game">
-        <a class="gp-shot card-cover" ${playAttrs(g)} aria-label="Play ${esc(g.name)}">
+        <a class="gp-shot card-cover" ${playAttrs(g)} aria-label="${coverLabel(g)}">
           <img src="${esc(g.thumbnail)}" alt="${esc(g.name)} screenshot" width="${g.thumbSize.width}" height="${g.thumbSize.height}" decoding="async" fetchpriority="high" /><span class="${statusClass(g.status)}">${esc(g.status)}</span>
         </a>
         <div class="gp-info">

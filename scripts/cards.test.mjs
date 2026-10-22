@@ -1,10 +1,14 @@
-// Home-page cards: info button, player chips, link styles, and the "more games soon" placeholder. Run with `npm test`.
+// Home-page cards (info button, player chips, link styles, "more games soon", external games), loadGames and gamePageHtml. Run with `npm test`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { cardHtml, gamePageHtml, gridHtml, loadGames } from './seo.mjs';
+
+const ROOT = join(import.meta.dirname, '..');
 
 const base = {
   id: 'demo',
@@ -52,7 +56,7 @@ const external = { ...base, id: 'ext-game', name: 'Ext Game', playUrl: 'https://
 test('external card: primary Play goes to playUrl in a new tab, no /play.html link', () => {
   const html = cardHtml(external, 0);
   assert.ok(html.includes('<a class="btn btn-primary" href="https://ext.example/play" target="_blank" rel="noopener noreferrer">Play</a>'));
-  assert.match(html, /<a class="card-cover" href="https:\/\/ext\.example\/play" target="_blank" rel="noopener noreferrer" aria-label="Play Ext Game">/);
+  assert.match(html, /<a class="card-cover" href="https:\/\/ext\.example\/play" target="_blank" rel="noopener noreferrer" aria-label="Play Ext Game \(opens in a new tab\)">/);
   assert.ok(html.includes(`<img src="${BLOB}"`));
   assert.ok(!html.includes('/play.html'));
 });
@@ -73,7 +77,7 @@ test('user game card keeps its /play.html cover and Play here button', () => {
 test('external game page: Play buttons open playUrl in a new tab, no /play.html link', () => {
   const html = gamePageHtml(external);
   assert.ok(html.includes('<a class="btn btn-primary btn-lg" href="https://ext.example/play" target="_blank" rel="noopener noreferrer">Play</a>'));
-  assert.match(html, /<a class="gp-shot card-cover" href="https:\/\/ext\.example\/play" target="_blank" rel="noopener noreferrer"/);
+  assert.match(html, /<a class="gp-shot card-cover" href="https:\/\/ext\.example\/play" target="_blank" rel="noopener noreferrer" aria-label="Play Ext Game \(opens in a new tab\)">/);
   assert.ok(!html.includes('/play.html'));
   assert.ok(!html.includes('Play in browser'));
 });
@@ -110,4 +114,49 @@ test('loadGames rejects remote thumbnails that are not https Vercel Blob URLs', 
     assert.deepEqual(loadGames(gamesFile(t, [{ ...entry, thumbnail }])), [], thumbnail);
   }
   assert.equal(warn.mock.callCount(), bad.length);
+});
+
+const CREDENTIALED = 'https://user:pw@abc123.public.blob.vercel-storage.com/thumbs/ext.png';
+
+test('loadGames rejects a blob thumbnail that carries credentials, and never echoes them', (t) => {
+  const warn = t.mock.method(console, 'warn', () => {});
+  assert.deepEqual(loadGames(gamesFile(t, [{ ...entry, thumbnail: CREDENTIALED }])), []);
+  assert.equal(warn.mock.callCount(), 1);
+  assert.ok(!JSON.stringify(warn.mock.calls.map((c) => c.arguments)).includes('pw'));
+});
+
+/** src/games.ts with no bundler: type-stripped, its CSS import dropped and its shared import pointed at the file. */
+async function importBrowserGames() {
+  const shared = pathToFileURL(join(ROOT, 'src/shared/submission-rules.mjs')).href;
+  const source = readFileSync(join(ROOT, 'src/games.ts'), 'utf8')
+    .replace("import './style.css';", '')
+    .replace("'./shared/submission-rules.mjs'", JSON.stringify(shared));
+  const js = stripTypeScriptTypes(source);
+  return import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
+}
+
+test('browser loader (src/games.ts) rejects credentialed blob thumbnails and keeps plain ones', async (t) => {
+  const { loadGames: loadBrowserGames } = await importBrowserGames();
+  const respond = (thumbnail) => async () => ({ ok: true, json: async () => [{ ...entry, thumbnail }] });
+
+  t.mock.method(globalThis, 'fetch', respond(CREDENTIALED));
+  assert.deepEqual(await loadBrowserGames(), []);
+
+  t.mock.method(globalThis, 'fetch', respond(BLOB));
+  const games = await loadBrowserGames();
+  assert.equal(games.length, 1);
+  assert.equal(games[0].thumbnail, BLOB);
+});
+
+test('hosted game page keeps its /play.html Play buttons and Play in browser link', () => {
+  const html = gamePageHtml(base);
+  assert.ok(html.includes('<a class="btn btn-primary btn-lg" href="/play.html?id=demo">Play here</a>'));
+  assert.ok(html.includes('<a class="btn btn-ghost" href="https://example.com" target="_blank" rel="noopener">Play in browser ↗</a>'));
+  assert.ok(html.includes('<a class="gp-shot card-cover" href="/play.html?id=demo" aria-label="Play Demo">'));
+});
+
+test('home.ts and seo.mjs use the same external cover label suffix', () => {
+  const suffix = ' (opens in a new tab)';
+  assert.ok(readFileSync(join(ROOT, 'src/home.ts'), 'utf8').includes(suffix));
+  assert.ok(readFileSync(join(ROOT, 'scripts/seo.mjs'), 'utf8').includes(suffix));
 });

@@ -23,7 +23,7 @@ function card(game: Game, index: number): HTMLLIElement {
     : { href: `/play.html?id=${encodeURIComponent(game.id)}` };
   const cover = el(
     'a',
-    { class: 'card-cover', ...playLink, 'aria-label': game.external ? `Play ${game.name}` : `Play ${game.name} here` },
+    { class: 'card-cover', ...playLink, 'aria-label': game.external ? `Play ${game.name} (opens in a new tab)` : `Play ${game.name} here` },
     img,
     el('span', { class: statusClass(game.status) }, game.status),
   );
