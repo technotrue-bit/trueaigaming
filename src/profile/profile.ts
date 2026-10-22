@@ -111,10 +111,10 @@ async function load(): Promise<void> {
     }
 
     // Anyone can read approved submissions under RLS. The owner is matched by handle through the embedded profile, so
-    // the profile id is never read.
+    // the profile id is never read. The embed names the owner key because submissions has two keys to profiles.
     const gamesReply = await supabase
       .from('submissions')
-      .select('slug, name, description, profiles!inner(handle)')
+      .select('slug, name, description, profiles!submissions_owner_id_fkey!inner(handle)')
       .eq('status', 'approved')
       .eq('profiles.handle', handle)
       .order('name', { ascending: true });

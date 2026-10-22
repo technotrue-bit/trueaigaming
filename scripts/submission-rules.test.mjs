@@ -199,6 +199,17 @@ test('blob thumbnail: a host that only contains the suffix is refused', () => {
   assert.equal(isBlobThumbnailUrl('https://public.blob.vercel-storage.com/x.png'), false);
 });
 
+test('blob thumbnail: with a store host set, only that exact host is accepted', () => {
+  const host = 'abc123.public.blob.vercel-storage.com';
+  assert.equal(isBlobThumbnailUrl('https://abc123.public.blob.vercel-storage.com/x.png', host), true);
+  assert.equal(isBlobThumbnailUrl('https://abc123.public.blob.vercel-storage.com/x.png', 'ABC123.public.blob.vercel-storage.com'), true);
+  assert.equal(isBlobThumbnailUrl('https://other.public.blob.vercel-storage.com/x.png', host), false);
+  assert.equal(isBlobThumbnailUrl('https://evil.com/x.png', host), false);
+  // An empty or missing host leaves the generic rule.
+  assert.equal(isBlobThumbnailUrl('https://other.public.blob.vercel-storage.com/x.png', ''), true);
+  assert.equal(isBlobThumbnailUrl('https://other.public.blob.vercel-storage.com/x.png', undefined), true);
+});
+
 test('blob thumbnail: http and other hosts are refused', () => {
   assert.equal(isBlobThumbnailUrl('http://abc.public.blob.vercel-storage.com/x.png'), false);
   assert.equal(isBlobThumbnailUrl('https://evil.com/x.png'), false);
@@ -297,4 +308,14 @@ test('submission returns the canonical thumbnail href', () => {
   const r = validateSubmission(withFields({ thumbnailUrl: '  HTTPS://ABC.Public.Blob.Vercel-Storage.com/a b.png  ' }));
   assert.equal(r.ok, true);
   assert.equal(r.value.thumbnailUrl, 'https://abc.public.blob.vercel-storage.com/a%20b.png');
+});
+
+test('validateSubmission takes the store host and refuses a thumbnail from another Blob store', () => {
+  const host = 'abc123.public.blob.vercel-storage.com';
+  const mine = withFields({ thumbnailUrl: 'https://abc123.public.blob.vercel-storage.com/x.png' });
+  const other = withFields({ thumbnailUrl: 'https://other.public.blob.vercel-storage.com/x.png' });
+  assert.equal(validateSubmission(mine, { blobHost: host }).ok, true);
+  assert.deepEqual(validateSubmission(other, { blobHost: host }), { ok: false, error: 'Thumbnail must be hosted on Vercel Blob' });
+  assert.equal(validateSubmission(other).ok, true);
+  assert.equal(validateSubmission(withFields({ thumbnailUrl: null }), { blobHost: host }).ok, true);
 });

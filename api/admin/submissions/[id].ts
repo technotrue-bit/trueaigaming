@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { reviewSubmission } from '../../../server/admin.mjs';
+import { firstPartyIds } from '../../_first-party.js';
 import { requireUser } from '../../../server/auth.mjs';
 import { hookRebuild } from '../../../server/deploy.mjs';
 import { InvalidJson, PayloadTooLarge, readJson, send } from '../../../server/http.mjs';
@@ -17,10 +18,10 @@ function idFrom(req: IncomingMessage): string {
   return typeof query?.id === 'string' ? query.id : '';
 }
 
-/** The action and note from the JSON body. Anything else is undefined, which the logic refuses. */
-function fieldsFrom(body: unknown): { action: unknown; note: unknown } {
-  const fields = typeof body === 'object' && body !== null ? (body as { action?: unknown; note?: unknown }) : {};
-  return { action: fields.action, note: fields.note };
+/** The action, note and updated_at (the card's, as the admin loaded it) from the JSON body. Anything else is undefined, which the logic refuses. */
+function fieldsFrom(body: unknown): { action: unknown; note: unknown; updatedAt: unknown } {
+  const fields = typeof body === 'object' && body !== null ? (body as { action?: unknown; note?: unknown; updated_at?: unknown }) : {};
+  return { action: fields.action, note: fields.note, updatedAt: fields.updated_at };
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -46,16 +47,20 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       if (err instanceof InvalidJson) return send(res, 400, { ok: false, error: 'Invalid JSON' });
       throw err;
     }
-    const { action, note } = fieldsFrom(body);
+    const { action, note, updatedAt } = fieldsFrom(body);
 
     // The hook URL is read here and never returned or logged. The logic runs every rebuild through rebuildForClient.
     const result = await reviewSubmission({
       store,
       adminId: auth.user.id,
       id: idFrom(req),
+      updatedAt,
       action,
       note,
       rebuild: hookRebuild(process.env.DEPLOY_HOOK_URL),
+      // Both are read here, so the logic never touches the file system or the environment.
+      firstPartyIds: firstPartyIds(),
+      blobHost: process.env.BLOB_PUBLIC_HOST,
     });
     if (!result.ok) return send(res, result.status, { ok: false, error: result.error });
 

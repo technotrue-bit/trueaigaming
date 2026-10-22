@@ -19,10 +19,12 @@ const REPUBLISH_PATH = '/api/admin/republish';
 
 /**
  * A game waiting for review, as GET /api/admin/submissions returns it. Only the fields this page shows are read.
- * owner_handle is the owner's handle, or null when the owner has no profile.
+ * owner_handle is the owner's handle, or null when the owner has no profile. updated_at goes back with the review, so
+ * the server can refuse a card the owner has edited since it loaded.
  */
 interface PendingRow {
   id: string;
+  updated_at: string;
   owner_handle: string | null;
   name: string;
   description: string;
@@ -143,7 +145,7 @@ function cardFor(row: PendingRow): HTMLLIElement {
     setBusy(true);
     setStatus(status, '');
     try {
-      const reply = await apiFetch<ReviewReply>(reviewPath(id), { method: 'POST', body: JSON.stringify({ action: 'approve' }) });
+      const reply = await apiFetch<ReviewReply>(reviewPath(id), { method: 'POST', body: JSON.stringify({ action: 'approve', updated_at: row.updated_at }) });
       item.remove();
       settleEmpty();
       setStatus(actionStatus, reply.rebuild?.ok === true ? APPROVED_LIVE : REBUILD_NOT_STARTED);
@@ -164,7 +166,7 @@ function cardFor(row: PendingRow): HTMLLIElement {
     setBusy(true);
     setStatus(status, '');
     try {
-      await apiFetch<ReviewReply>(reviewPath(id), { method: 'POST', body: JSON.stringify({ action: 'reject', note: text }) });
+      await apiFetch<ReviewReply>(reviewPath(id), { method: 'POST', body: JSON.stringify({ action: 'reject', note: text, updated_at: row.updated_at }) });
       item.remove();
       settleEmpty();
       setStatus(actionStatus, REJECTED);

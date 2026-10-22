@@ -85,7 +85,7 @@ if [ "$STATUS" != 0 ] || [ "$(echo "$RESULT" | tail -n 1)" != "rls ok" ]; then
 fi
 
 # Concurrency. SESSIONS psql sessions run in parallel, wait for a shared start time, then each try ATTEMPTS inserts
-# for the same owner as a signed-in user. The caps are triggers that take a per-owner advisory lock, so the totals must be exact.
+# for the same owner as the service role (the API is the only writer; authenticated has no insert grant). The caps are triggers that take a per-owner advisory lock, so the totals must be exact.
 SESSIONS=4
 ATTEMPTS=5
 ROUNDS=5
@@ -101,8 +101,7 @@ run_sessions() {  # $1 = owner uuid, $2 = status for the inserts, $3 = round lab
   for ((s = 1; s <= SESSIONS; s++)); do
     file="$WORK/session-$3-$s.sql"
     {
-      echo "set role authenticated;"
-      echo "select set_config('request.jwt.claims', '{\"sub\":\"$1\"}', false);"
+      echo "set role service_role;"
       echo "select pg_sleep(greatest(0, extract(epoch from (timestamp '$start' - clock_timestamp()))));"
       for ((i = 1; i <= ATTEMPTS; i++)); do
         echo "insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players, status) values ('$1', 'c-$3-$s-$i', 'n', 'd', 'h', 'https://x.com', 1, 2, '$2');"

@@ -27,8 +27,10 @@ create table profiles (
 
 create table submissions (
   id uuid primary key default gen_random_uuid(),
-  -- This foreign key is required: PostgREST embeds profiles(handle) and profiles!inner(handle) through it.
-  owner_id uuid not null references profiles (id) on delete cascade,
+  -- This foreign key is required: PostgREST embeds the owner's profile through it. Both foreign keys to profiles are
+  -- named, because a bare profiles(...) embed is ambiguous with two of them (PGRST201). Every embed names the owner
+  -- key with a hint: profiles!submissions_owner_id_fkey(handle).
+  owner_id uuid not null constraint submissions_owner_id_fkey references profiles (id) on delete cascade,
   slug text not null unique
     constraint submissions_slug_format check (slug ~ '^[a-z0-9-]{3,60}$'),
   name text not null
@@ -49,7 +51,7 @@ create table submissions (
   max_players integer not null,
   status submission_status not null default 'pending',
   review_note text,
-  reviewed_by uuid references profiles (id) on delete set null,
+  reviewed_by uuid constraint submissions_reviewed_by_fkey references profiles (id) on delete set null,
   reviewed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -170,27 +172,12 @@ revoke all on my_submissions from anon, authenticated;
 grant select on my_submissions to authenticated;
 grant all on my_submissions to service_role;
 
--- Owners insert only as pending, and update only the content columns plus status, which the policy limits to
--- 'pending'. Granting status for update is what lets an edit send an approved row back to review; the policy
--- check below makes any other status value fail. owner_id is not updatable. No client role can write
--- review_note, reviewed_by or reviewed_at.
-grant insert (owner_id, name, slug, description, how_it_was_made, play_url, source_url, thumbnail_url,
-              min_players, max_players, status)
-  on submissions to authenticated;
-grant update (name, slug, description, how_it_was_made, play_url, source_url, thumbnail_url,
-              min_players, max_players, status)
-  on submissions to authenticated;
-grant delete on submissions to authenticated;
+-- No client role can write submissions. The API is the only writer, through the service role, and the browser only
+-- reads. authenticated therefore has no INSERT, UPDATE or DELETE grant on submissions (the revoke above leaves it
+-- with the select grants only), and there are no policies for those commands, so row-level security refuses them too.
+-- The server checks ownership and the fields before it writes, and the triggers and constraints still bind it.
 
 create policy submissions_select_approved on submissions
   for select to anon, authenticated using (status = 'approved');
 create policy submissions_select_own on submissions
   for select to authenticated using (owner_id = auth.uid());
-create policy submissions_insert_own on submissions
-  for insert to authenticated with check (owner_id = auth.uid() and status = 'pending');
-create policy submissions_update_own on submissions
-  for update to authenticated
-  using (owner_id = auth.uid())
-  with check (owner_id = auth.uid() and status = 'pending');
-create policy submissions_delete_own on submissions
-  for delete to authenticated using (owner_id = auth.uid());

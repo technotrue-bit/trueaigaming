@@ -7,6 +7,7 @@ import {
   createSubmission,
   deleteSubmission,
   getOwnSubmission,
+  listOwnSubmissions,
   submissionInput,
   updateSubmission,
 } from './submissions.mjs';
@@ -16,6 +17,11 @@ const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 const OWNER = 'owner-1';
 const OTHER = 'owner-2';
+
+/** A test store where both owners have a profile, as createSubmission needs. A test can pass its own profiles. */
+function testStore(seed = {}) {
+  return createTestStore({ profiles: [{ id: OWNER, handle: 'owner' }, { id: OTHER, handle: 'other' }], ...seed });
+}
 const NOT_FOUND = { ok: false, status: 404, error: 'Not found' };
 
 /** A uuid-shaped id, so ids look like the ones Postgres generates. */
@@ -66,7 +72,7 @@ function pngBytes(size = 16) {
 
 test('pending cap: sixth pending submission is refused without inserting', async () => {
   const pending = [1, 2, 3, 4, 5].map((n) => seed({ id: ID(n), slug: `old-${n}` }));
-  const store = createTestStore({ submissions: pending });
+  const store = testStore({ submissions: pending });
   const result = await createSubmission({ store, ownerId: OWNER, input: input(), now: NOW });
   assert.deepEqual(result, { ok: false, status: 429, error: 'You can have 5 pending submissions at a time' });
   assert.equal(store.state.submissions.size, 5);
@@ -74,7 +80,7 @@ test('pending cap: sixth pending submission is refused without inserting', async
 
 test('pending cap: four pending submissions still allow a fifth', async () => {
   const pending = [1, 2, 3, 4].map((n) => seed({ id: ID(n), slug: `old-${n}` }));
-  const store = createTestStore({ submissions: pending });
+  const store = testStore({ submissions: pending });
   const result = await createSubmission({ store, ownerId: OWNER, input: input(), now: NOW });
   assert.equal(result.ok, true);
   assert.equal(store.state.submissions.size, 5);
@@ -82,7 +88,7 @@ test('pending cap: four pending submissions still allow a fifth', async () => {
 
 test('daily cap: fourth submission in 24 hours is refused', async () => {
   const recent = [1, 2, 3].map((n) => seed({ id: ID(n), slug: `recent-${n}`, status: 'approved', created_at: iso(NOW - HOUR) }));
-  const store = createTestStore({ submissions: recent });
+  const store = testStore({ submissions: recent });
   const result = await createSubmission({ store, ownerId: OWNER, input: input(), now: NOW });
   assert.deepEqual(result, { ok: false, status: 429, error: 'You can add 3 new submissions per day' });
   assert.equal(store.state.submissions.size, 3);
@@ -90,13 +96,13 @@ test('daily cap: fourth submission in 24 hours is refused', async () => {
 
 test('daily cap: submissions older than 24 hours do not count', async () => {
   const old = [1, 2, 3].map((n) => seed({ id: ID(n), slug: `old-${n}`, status: 'approved', created_at: iso(NOW - 25 * HOUR) }));
-  const store = createTestStore({ submissions: old });
+  const store = testStore({ submissions: old });
   const result = await createSubmission({ store, ownerId: OWNER, input: input(), now: NOW });
   assert.equal(result.ok, true);
 });
 
 test('double submit: repeating the same slug creates one row, second gets 409', async () => {
-  const store = createTestStore();
+  const store = testStore();
   const first = await createSubmission({ store, ownerId: OWNER, input: input(), now: NOW });
   const second = await createSubmission({ store, ownerId: OWNER, input: input(), now: NOW });
   assert.equal(first.ok, true);
@@ -105,7 +111,7 @@ test('double submit: repeating the same slug creates one row, second gets 409', 
 });
 
 test('non-owner GET and PATCH return 404, not 403', async () => {
-  const store = createTestStore({ submissions: [seed({ status: 'approved' })] });
+  const store = testStore({ submissions: [seed({ status: 'approved' })] });
   const spy = rebuildSpy();
   assert.deepEqual(await getOwnSubmission({ store, ownerId: OTHER, id: ID(1) }), NOT_FOUND);
   assert.deepEqual(
@@ -118,7 +124,7 @@ test('non-owner GET and PATCH return 404, not 403', async () => {
 });
 
 test('non-owner DELETE returns 404 and keeps the row, and a missing id looks the same', async () => {
-  const store = createTestStore({ submissions: [seed({ status: 'approved' })] });
+  const store = testStore({ submissions: [seed({ status: 'approved' })] });
   const spy = rebuildSpy();
   assert.deepEqual(await deleteSubmission({ store, ownerId: OTHER, id: ID(1), rebuild: spy.rebuild }), NOT_FOUND);
   assert.deepEqual(await deleteSubmission({ store, ownerId: OWNER, id: ID(9), rebuild: spy.rebuild }), NOT_FOUND);
@@ -127,12 +133,12 @@ test('non-owner DELETE returns 404 and keeps the row, and a missing id looks the
 });
 
 test('a malformed id is not found', async () => {
-  const store = createTestStore({ submissions: [seed()] });
+  const store = testStore({ submissions: [seed()] });
   assert.deepEqual(await getOwnSubmission({ store, ownerId: OWNER, id: 'not-a-uuid' }), NOT_FOUND);
 });
 
 test('editing an approved submission sets pending and calls rebuild once', async () => {
-  const store = createTestStore({ submissions: [seed({ status: 'approved' })] });
+  const store = testStore({ submissions: [seed({ status: 'approved' })] });
   const spy = rebuildSpy();
   const result = await updateSubmission({
     store, ownerId: OWNER, id: ID(1), input: input({ name: 'Star Pie Deluxe' }), now: NOW, rebuild: spy.rebuild,
@@ -146,7 +152,7 @@ test('editing an approved submission sets pending and calls rebuild once', async
 });
 
 test('editing a rejected submission sets pending, clears the review note, and does not rebuild', async () => {
-  const store = createTestStore({ submissions: [seed({ status: 'rejected', review_note: 'Describe the game more' })] });
+  const store = testStore({ submissions: [seed({ status: 'rejected', review_note: 'Describe the game more' })] });
   const spy = rebuildSpy();
   const result = await updateSubmission({ store, ownerId: OWNER, id: ID(1), input: input(), now: NOW, rebuild: spy.rebuild });
   assert.equal(result.ok, true);
@@ -158,7 +164,7 @@ test('editing a rejected submission sets pending, clears the review note, and do
 });
 
 test('deleting an approved submission calls rebuild once', async () => {
-  const store = createTestStore({ submissions: [seed({ status: 'approved' })] });
+  const store = testStore({ submissions: [seed({ status: 'approved' })] });
   const spy = rebuildSpy();
   const result = await deleteSubmission({ store, ownerId: OWNER, id: ID(1), rebuild: spy.rebuild });
   assert.deepEqual(result, { ok: true, value: { wasApproved: true, rebuild: { ok: true } } });
@@ -167,7 +173,7 @@ test('deleting an approved submission calls rebuild once', async () => {
 });
 
 test('deleting a pending submission does not call rebuild', async () => {
-  const store = createTestStore({ submissions: [seed({ status: 'pending' })] });
+  const store = testStore({ submissions: [seed({ status: 'pending' })] });
   const spy = rebuildSpy();
   const result = await deleteSubmission({ store, ownerId: OWNER, id: ID(1), rebuild: spy.rebuild });
   assert.deepEqual(result, { ok: true, value: { wasApproved: false, rebuild: null } });
@@ -176,7 +182,7 @@ test('deleting a pending submission does not call rebuild', async () => {
 });
 
 test('deleting an approved submission still rebuilds when the delete commits and then throws', async () => {
-  const store = createTestStore({ submissions: [seed({ status: 'approved' })] });
+  const store = testStore({ submissions: [seed({ status: 'approved' })] });
   const remove = store.deleteSubmission;
   store.deleteSubmission = async (id) => { await remove(id); throw new Error('connection reset'); };
   const spy = rebuildSpy();
@@ -187,7 +193,7 @@ test('deleting an approved submission still rebuilds when the delete commits and
 
 test('a rebuild that fails after an edit still saves the edit', async (t) => {
   t.mock.method(console, 'error', () => {});
-  const store = createTestStore({ submissions: [seed({ status: 'approved' })] });
+  const store = testStore({ submissions: [seed({ status: 'approved' })] });
   const spy = rebuildSpy({ ok: false, error: 'Rebuild hook returned 500' });
   const result = await updateSubmission({ store, ownerId: OWNER, id: ID(1), input: input({ name: 'Edited' }), now: NOW, rebuild: spy.rebuild });
   assert.equal(result.ok, true);
@@ -198,7 +204,7 @@ test('a rebuild that fails after an edit still saves the edit', async (t) => {
 
 test('a rebuild that throws after an edit still saves the edit', async (t) => {
   t.mock.method(console, 'error', () => {});
-  const store = createTestStore({ submissions: [seed({ status: 'approved' })] });
+  const store = testStore({ submissions: [seed({ status: 'approved' })] });
   const result = await updateSubmission({
     store, ownerId: OWNER, id: ID(1), input: input({ name: 'Edited' }), now: NOW,
     rebuild: async () => { throw new Error('boom'); },
@@ -209,7 +215,7 @@ test('a rebuild that throws after an edit still saves the edit', async (t) => {
 });
 
 test('editing to a game address another submission holds returns 409', async () => {
-  const store = createTestStore({
+  const store = testStore({
     submissions: [seed({ id: ID(1) }), seed({ id: ID(2), owner_id: OTHER, slug: 'taken-slug' })],
   });
   const spy = rebuildSpy();
@@ -222,7 +228,7 @@ test('editing to a game address another submission holds returns 409', async () 
 });
 
 test('createSubmission creates a pending row owned by the caller', async () => {
-  const store = createTestStore();
+  const store = testStore();
   const result = await createSubmission({ store, ownerId: OWNER, input: input(), now: NOW });
   assert.equal(result.ok, true);
   assert.equal(result.value.owner_id, OWNER);
@@ -234,14 +240,14 @@ test('createSubmission creates a pending row owned by the caller', async () => {
 });
 
 test('a validation error returns 400 and inserts nothing', async () => {
-  const store = createTestStore();
+  const store = testStore();
   const result = await createSubmission({ store, ownerId: OWNER, input: input({ name: '' }), now: NOW });
   assert.deepEqual(result, { ok: false, status: 400, error: 'Name is required' });
   assert.equal(store.state.submissions.size, 0);
 });
 
 test('the stored links are the canonical hrefs from validateSubmission, not the raw input', async () => {
-  const store = createTestStore();
+  const store = testStore();
   const result = await createSubmission({
     store, ownerId: OWNER, now: NOW,
     input: input({
@@ -255,7 +261,7 @@ test('the stored links are the canonical hrefs from validateSubmission, not the 
 });
 
 test('thumbnail: a thumbnail URL from another host is refused with 400', async () => {
-  const store = createTestStore();
+  const store = testStore();
   const result = await createSubmission({
     store, ownerId: OWNER, input: input({ thumbnailUrl: 'https://example.com/thumb.png' }), now: NOW,
   });
@@ -264,7 +270,7 @@ test('thumbnail: a thumbnail URL from another host is refused with 400', async (
 });
 
 test('thumbnail: a thumbnail URL with credentials is refused, even on a Blob host', async () => {
-  const store = createTestStore();
+  const store = testStore();
   const result = await createSubmission({
     store, ownerId: OWNER,
     input: input({ thumbnailUrl: 'https://user:pass@store.public.blob.vercel-storage.com/thumb.png' }),
@@ -298,7 +304,7 @@ test('submissionInput maps snake_case form fields to camelCase and player counts
     maxPlayers: 16,
   });
   // A player count that is not a plain whole number stays text, so validatePlayers refuses it.
-  const store = createTestStore();
+  const store = testStore();
   const result = await createSubmission({
     store, ownerId: OWNER, now: NOW,
     input: submissionInput({ ...body, min_players: '2.5' }),
@@ -337,7 +343,7 @@ test('thumbnail: JPEG and WebP signatures must match their declared types', () =
 
 test('a failed rebuild gives the client a fixed message, and the config name never appears', async (t) => {
   const logs = t.mock.method(console, 'error', () => {});
-  const store = createTestStore({ submissions: [seed({ status: 'approved' })] });
+  const store = testStore({ submissions: [seed({ status: 'approved' })] });
   const spy = rebuildSpy({ ok: false, error: 'DEPLOY_HOOK_URL is not set' });
   const result = await updateSubmission({ store, ownerId: OWNER, id: ID(1), input: input({ name: 'Edited' }), now: NOW, rebuild: spy.rebuild });
   assert.equal(result.ok, true);
@@ -350,7 +356,7 @@ test('a failed rebuild gives the client a fixed message, and the config name nev
 test('editing a rejected submission when five are already pending is refused with 429', async () => {
   const pending = [1, 2, 3, 4, 5].map((n) => seed({ id: ID(n), slug: `pending-${n}` }));
   const rejected = seed({ id: ID(6), slug: 'rejected-one', status: 'rejected', review_note: 'Describe it' });
-  const store = createTestStore({ submissions: [...pending, rejected] });
+  const store = testStore({ submissions: [...pending, rejected] });
   const spy = rebuildSpy();
   const result = await updateSubmission({ store, ownerId: OWNER, id: ID(6), input: input({ slug: 'rejected-one' }), now: NOW, rebuild: spy.rebuild });
   assert.deepEqual(result, { ok: false, status: 429, error: 'You can have 5 pending submissions at a time' });
@@ -360,7 +366,7 @@ test('editing a rejected submission when five are already pending is refused wit
 });
 
 test('the logic refuses another owner\'s row even when the store returns it', async () => {
-  const store = createTestStore({ submissions: [seed({ owner_id: OTHER, status: 'approved' })] });
+  const store = testStore({ submissions: [seed({ owner_id: OTHER, status: 'approved' })] });
   // A store whose query ignores ownerId, so it returns the foreign row. Writes are counted.
   store.getOwnSubmission = async (_ownerId, id) => {
     const row = store.state.submissions.get(id);
@@ -385,7 +391,7 @@ test('the logic refuses another owner\'s row even when the store returns it', as
 
 test('a rebuild that throws is logged on the server with the error', async (t) => {
   const logs = t.mock.method(console, 'error', () => {});
-  const store = createTestStore({ submissions: [seed({ status: 'approved' })] });
+  const store = testStore({ submissions: [seed({ status: 'approved' })] });
   const boom = new Error('socket hang up');
   const result = await deleteSubmission({ store, ownerId: OWNER, id: ID(1), rebuild: async () => { throw boom; } });
   assert.deepEqual(result.value.rebuild, { ok: false, error: 'Rebuild did not start' });
@@ -394,7 +400,7 @@ test('a rebuild that throws is logged on the server with the error', async (t) =
 
 test('a rebuild that returns ok: false is logged on the server', async (t) => {
   const logs = t.mock.method(console, 'error', () => {});
-  const store = createTestStore({ submissions: [seed({ status: 'approved' })] });
+  const store = testStore({ submissions: [seed({ status: 'approved' })] });
   const spy = rebuildSpy({ ok: false, error: 'Rebuild hook returned 500' });
   const result = await deleteSubmission({ store, ownerId: OWNER, id: ID(1), rebuild: spy.rebuild });
   assert.deepEqual(result.value.rebuild, { ok: false, error: 'Rebuild did not start' });
@@ -407,21 +413,21 @@ test('a rebuild that returns ok: false is logged on the server', async (t) => {
 const dbError = (code, message) => Object.assign(new Error(message), { code });
 
 test('db limit: P0001 pending_limit on insert gives the 429 text and creates nothing', async () => {
-  const store = createTestStore({ failures: { insertSubmission: dbError('P0001', 'pending_limit') } });
+  const store = testStore({ failures: { insertSubmission: dbError('P0001', 'pending_limit') } });
   const result = await createSubmission({ store, ownerId: OWNER, input: input(), now: NOW });
   assert.deepEqual(result, { ok: false, status: 429, error: 'You can have 5 pending submissions at a time' });
   assert.equal(store.state.submissions.size, 0);
 });
 
 test('db limit: P0001 daily_limit on insert gives the 429 text', async () => {
-  const store = createTestStore({ failures: { insertSubmission: dbError('P0001', 'daily_limit') } });
+  const store = testStore({ failures: { insertSubmission: dbError('P0001', 'daily_limit') } });
   const result = await createSubmission({ store, ownerId: OWNER, input: input(), now: NOW });
   assert.deepEqual(result, { ok: false, status: 429, error: 'You can add 3 new submissions per day' });
   assert.equal(store.state.submissions.size, 0);
 });
 
 test('db limit: P0001 pending_limit on an update that makes a row pending gives the 429 text and leaves the row unchanged', async () => {
-  const store = createTestStore({
+  const store = testStore({
     submissions: [seed({ status: 'rejected', review_note: 'Describe it' })],
     failures: { updateSubmission: dbError('P0001', 'pending_limit') },
   });
@@ -434,7 +440,7 @@ test('db limit: P0001 pending_limit on an update that makes a row pending gives 
 });
 
 test('db limit: P0001 daily_limit on update gives the 429 text', async () => {
-  const store = createTestStore({
+  const store = testStore({
     submissions: [seed()],
     failures: { updateSubmission: dbError('P0001', 'daily_limit') },
   });
@@ -444,13 +450,13 @@ test('db limit: P0001 daily_limit on update gives the 429 text', async () => {
 
 test('db limit: 23514 gives the fixed 400 text and never the database message', async () => {
   const secret = 'new row for relation "submissions" violates check constraint "thumbnail_url_blob"';
-  const insertStore = createTestStore({ failures: { insertSubmission: dbError('23514', secret) } });
+  const insertStore = testStore({ failures: { insertSubmission: dbError('23514', secret) } });
   const created = await createSubmission({ store: insertStore, ownerId: OWNER, input: input(), now: NOW });
   assert.deepEqual(created, { ok: false, status: 400, error: 'Those game details were not accepted.' });
   assert.equal(JSON.stringify(created).includes('violates'), false);
   assert.equal(insertStore.state.submissions.size, 0);
 
-  const updateStore = createTestStore({ submissions: [seed()], failures: { updateSubmission: dbError('23514', secret) } });
+  const updateStore = testStore({ submissions: [seed()], failures: { updateSubmission: dbError('23514', secret) } });
   const updated = await updateSubmission({ store: updateStore, ownerId: OWNER, id: ID(1), input: input(), now: NOW, rebuild: rebuildSpy().rebuild });
   assert.deepEqual(updated, { ok: false, status: 400, error: 'Those game details were not accepted.' });
   assert.equal(JSON.stringify(updated).includes('violates'), false);
@@ -458,13 +464,111 @@ test('db limit: 23514 gives the fixed 400 text and never the database message', 
 
 test('db limit: an unrelated error, or P0001 with another message, is rethrown unchanged', async () => {
   const boom = dbError('XX000', 'connection lost');
-  const insertStore = createTestStore({ failures: { insertSubmission: boom } });
+  const insertStore = testStore({ failures: { insertSubmission: boom } });
   await assert.rejects(createSubmission({ store: insertStore, ownerId: OWNER, input: input(), now: NOW }), (err) => err === boom);
 
   const other = dbError('P0001', 'something_else');
-  const updateStore = createTestStore({ submissions: [seed()], failures: { updateSubmission: other } });
+  const updateStore = testStore({ submissions: [seed()], failures: { updateSubmission: other } });
   await assert.rejects(
     updateSubmission({ store: updateStore, ownerId: OWNER, id: ID(1), input: input(), now: NOW, rebuild: rebuildSpy().rebuild }),
     (err) => err === other,
   );
+});
+
+// ---------- Final review fixes ----------
+
+const SLUG_TAKEN = { ok: false, status: 409, error: 'That game address is taken' };
+const CHANGED = { ok: false, status: 409, error: 'This game changed, reload and try again' };
+const BLOB_HOST = 'abc123.public.blob.vercel-storage.com';
+
+test('create: an owner with no profile gets 409 and nothing is inserted', async () => {
+  const store = testStore({ profiles: [] });
+  const result = await createSubmission({ store, ownerId: OWNER, input: input(), now: NOW });
+  assert.deepEqual(result, { ok: false, status: 409, error: 'Choose a handle first' });
+  assert.equal(store.state.submissions.size, 0);
+});
+
+test('create: a game address that is a first-party game id gets 409 and nothing is inserted', async () => {
+  const store = testStore();
+  const result = await createSubmission({
+    store, ownerId: OWNER, input: input({ slug: 'super-star-party' }), now: NOW, firstPartyIds: ['super-star-party'],
+  });
+  assert.deepEqual(result, SLUG_TAKEN);
+  assert.equal(store.state.submissions.size, 0);
+  // Any other address still goes through with the same list.
+  const ok = await createSubmission({ store, ownerId: OWNER, input: input(), now: NOW, firstPartyIds: ['super-star-party'] });
+  assert.equal(ok.ok, true);
+});
+
+test('update: a game address that is a first-party game id gets 409 and the row is unchanged', async () => {
+  const store = testStore({ submissions: [seed()] });
+  const spy = rebuildSpy();
+  const result = await updateSubmission({
+    store, ownerId: OWNER, id: ID(1), input: input({ slug: 'super-star-party' }), now: NOW, rebuild: spy.rebuild, firstPartyIds: new Set(['super-star-party']),
+  });
+  assert.deepEqual(result, SLUG_TAKEN);
+  assert.equal(store.state.submissions.get(ID(1)).slug, 'star-pie');
+  assert.equal(spy.calls.length, 0);
+});
+
+test('create and update: with a store host set, a thumbnail on another Blob store gets 400', async () => {
+  const other = input({ thumbnailUrl: 'https://other.public.blob.vercel-storage.com/t.png' });
+  const mine = input({ thumbnailUrl: `https://${BLOB_HOST}/t.png` });
+  const refused = { ok: false, status: 400, error: 'Thumbnail must be hosted on Vercel Blob' };
+
+  const createStoreRows = testStore();
+  assert.deepEqual(await createSubmission({ store: createStoreRows, ownerId: OWNER, input: other, now: NOW, blobHost: BLOB_HOST }), refused);
+  assert.equal(createStoreRows.state.submissions.size, 0);
+  assert.equal((await createSubmission({ store: createStoreRows, ownerId: OWNER, input: mine, now: NOW, blobHost: BLOB_HOST })).ok, true);
+
+  const store = testStore({ submissions: [seed()] });
+  const result = await updateSubmission({ store, ownerId: OWNER, id: ID(1), input: other, now: NOW, rebuild: rebuildSpy().rebuild, blobHost: BLOB_HOST });
+  assert.deepEqual(result, refused);
+  assert.equal(store.state.submissions.get(ID(1)).thumbnail_url, null);
+  // Without the host the generic rule accepts it.
+  assert.equal((await updateSubmission({ store, ownerId: OWNER, id: ID(1), input: other, now: NOW, rebuild: rebuildSpy().rebuild })).ok, true);
+});
+
+test('owner responses never carry reviewed_by', async () => {
+  const reviewed = { reviewed_by: 'admin-1', reviewed_at: '2026-10-21T09:00:00.000Z', review_note: 'Nice', status: 'rejected' };
+  const store = testStore({ submissions: [seed(reviewed)] });
+  const got = await getOwnSubmission({ store, ownerId: OWNER, id: ID(1) });
+  assert.equal('reviewed_by' in got.value, false);
+  assert.equal(got.value.review_note, 'Nice');
+  const listed = await listOwnSubmissions({ store, ownerId: OWNER });
+  assert.equal(listed.length, 1);
+  assert.equal('reviewed_by' in listed[0], false);
+  const updated = await updateSubmission({ store, ownerId: OWNER, id: ID(1), input: input(), now: NOW, rebuild: rebuildSpy().rebuild });
+  assert.equal('reviewed_by' in updated.value.submission, false);
+  const created = await createSubmission({ store, ownerId: OWNER, input: input({ slug: 'another-one' }), now: NOW });
+  assert.equal('reviewed_by' in created.value, false);
+});
+
+test('an edit that sends a row back to pending clears the review note, reviewer and review time', async () => {
+  const store = testStore({ submissions: [seed({ status: 'approved', review_note: 'Nice', reviewed_by: 'admin-1', reviewed_at: '2026-10-21T09:00:00.000Z' })] });
+  const result = await updateSubmission({ store, ownerId: OWNER, id: ID(1), input: input(), now: NOW, rebuild: rebuildSpy().rebuild });
+  assert.equal(result.ok, true);
+  const row = store.state.submissions.get(ID(1));
+  assert.equal(row.status, 'pending');
+  assert.equal(row.review_note, null);
+  assert.equal(row.reviewed_by, null);
+  assert.equal(row.reviewed_at, null);
+});
+
+test('update: if the status changed since the read, the save is refused with 409 and the review stands', async () => {
+  const store = testStore({ submissions: [seed()] });
+  // The admin approves between the logic's read and its write.
+  const real = store.updateSubmissionIf;
+  store.updateSubmissionIf = async (id, expected, patch) => {
+    store.state.submissions.set(id, { ...store.state.submissions.get(id), status: 'approved', review_note: 'Nice', reviewed_by: 'admin-1' });
+    return real(id, expected, patch);
+  };
+  const spy = rebuildSpy();
+  const result = await updateSubmission({ store, ownerId: OWNER, id: ID(1), input: input({ name: 'Edited' }), now: NOW, rebuild: spy.rebuild });
+  assert.deepEqual(result, CHANGED);
+  const row = store.state.submissions.get(ID(1));
+  assert.equal(row.status, 'approved');
+  assert.equal(row.name, 'Star Pie');
+  assert.equal(row.review_note, 'Nice');
+  assert.equal(spy.calls.length, 0);
 });

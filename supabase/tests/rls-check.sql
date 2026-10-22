@@ -116,11 +116,18 @@ declare
   a_pending uuid; b_pending uuid; b_approved uuid; a_approved uuid;
   n bigint;
 begin
-  -- Schema shape the PostgREST embeds rely on.
-  perform t.eq('submissions.owner_id references profiles', (
+  -- Schema shape the PostgREST embeds rely on. submissions has exactly two foreign keys to profiles, and they are
+  -- named, because every embed names the owner key (profiles!submissions_owner_id_fkey) to stay unambiguous.
+  perform t.eq('submissions has exactly two foreign keys to profiles', (
+    select count(*) from pg_constraint where conrelid = 'submissions'::regclass and contype = 'f' and confrelid = 'profiles'::regclass), 2);
+  perform t.eq('submissions_owner_id_fkey is owner_id', (
     select count(*) from pg_constraint
-    where conrelid = 'submissions'::regclass and contype = 'f' and confrelid = 'profiles'::regclass
+    where conrelid = 'submissions'::regclass and contype = 'f' and confrelid = 'profiles'::regclass and conname = 'submissions_owner_id_fkey'
       and conkey = array[(select attnum from pg_attribute where attrelid = 'submissions'::regclass and attname = 'owner_id')]), 1);
+  perform t.eq('submissions_reviewed_by_fkey is reviewed_by', (
+    select count(*) from pg_constraint
+    where conrelid = 'submissions'::regclass and contype = 'f' and confrelid = 'profiles'::regclass and conname = 'submissions_reviewed_by_fkey'
+      and conkey = array[(select attnum from pg_attribute where attrelid = 'submissions'::regclass and attname = 'reviewed_by')]), 1);
   perform t.eq('rls enabled', (select count(*) from pg_class where oid in ('profiles'::regclass, 'submissions'::regclass) and relrowsecurity), 2);
 
   a_pending := t.sub(a, 'a-pending');
@@ -202,36 +209,33 @@ begin
   perform t.eq('B my_submissions own rows only', t.count('authenticated', b, 'select 1 from my_submissions'), 2);
   perform t.expect('anon my_submissions', 'anon', null, 'select * from my_submissions', '42501');
 
-  -- User A: writes.
-  perform t.expect('A status to approved', 'authenticated', a, format($q$update submissions set status = 'approved' where id = %L$q$, a_pending), '42501');
-  perform t.expect('A status to rejected', 'authenticated', a, format($q$update submissions set status = 'rejected' where id = %L$q$, a_pending), '42501');
-  perform t.expect('A approved row stays approved on content edit', 'authenticated', a, format($q$update submissions set name = 'Sneaky' where id = %L$q$, a_approved), '42501');
-  perform t.expect('A review_note', 'authenticated', a, format($q$update submissions set review_note = 'x' where id = %L$q$, a_pending), '42501');
-  perform t.expect('A reviewed_by', 'authenticated', a, format($q$update submissions set reviewed_by = %L where id = %L$q$, a, a_pending), '42501');
-  perform t.expect('A reviewed_at', 'authenticated', a, format($q$update submissions set reviewed_at = now() where id = %L$q$, a_pending), '42501');
-  perform t.expect('A owner_id', 'authenticated', a, format($q$update submissions set owner_id = %L where id = %L$q$, b, a_pending), '42501');
-  perform t.eq('A cannot update B row', t.exec('authenticated', a, format($q$update submissions set name = 'Hacked' where id = %L$q$, b_pending)), 0);
-  perform t.eq('A cannot update B approved row', t.exec('authenticated', a, format($q$update submissions set name = 'Hacked', status = 'pending' where id = %L$q$, b_approved)), 0);
-  perform t.eq('A cannot delete B row', t.exec('authenticated', a, format('delete from submissions where id = %L', b_pending)), 0);
-  perform t.eq('A cannot delete B approved row', t.exec('authenticated', a, format('delete from submissions where id = %L', b_approved)), 0);
-  perform t.eq('B rows untouched', (select count(*) from submissions where id in (b_pending, b_approved) and name not like 'Hacked'), 2);
-  perform t.eq('A edits own pending', t.exec('authenticated', a, format($q$update submissions set name = 'Mine', status = 'pending' where id = %L$q$, a_pending)), 1);
-  perform t.eq('A edit sends approved row back to pending', t.exec('authenticated', a, format($q$update submissions set name = 'Edited', status = 'pending' where id = %L$q$, a_approved)), 1);
-  perform t.eq('edited row is pending', (select count(*) from submissions where id = a_approved and status = 'pending'), 1);
-  update submissions set status = 'approved' where id = a_approved;
+  -- User A: no writes. The API writes through the service role, so authenticated has no INSERT, UPDATE or DELETE
+  -- grant on submissions, on any column, and no policy allows one either. The privilege check comes first (42501).
+  perform t.eq('authenticated has no table write privilege on submissions', (select count(*) from unnest(array['insert', 'update', 'delete']) as p
+    where has_table_privilege('authenticated', 'submissions', p)), 0);
+  perform t.eq('authenticated has no column write privilege on submissions', (select count(*) from pg_attribute at, unnest(array['insert', 'update']) as p
+    where at.attrelid = 'submissions'::regclass and at.attnum > 0 and not at.attisdropped
+      and has_column_privilege('authenticated', 'submissions', at.attname, p)), 0);
+  perform t.eq('authenticated has no policy for a write command', (select count(*) from pg_policies
+    where tablename = 'submissions' and cmd <> 'SELECT'), 0);
+  perform t.expect('A insert own pending', 'authenticated', a,
+    format($q$insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players) values (%L, 'a-second', 'n', 'd', 'h', 'https://x.com', 1, 2)$q$, a), '42501');
   perform t.expect('A insert as approved', 'authenticated', a,
     format($q$insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players, status) values (%L, 'a-sneaky', 'n', 'd', 'h', 'https://x.com', 1, 2, 'approved')$q$, a), '42501');
   perform t.expect('A insert for B', 'authenticated', a,
     format($q$insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players) values (%L, 'a-for-b', 'n', 'd', 'h', 'https://x.com', 1, 2)$q$, b), '42501');
-  perform t.expect('A insert with review_note', 'authenticated', a,
-    format($q$insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players, review_note) values (%L, 'a-note', 'n', 'd', 'h', 'https://x.com', 1, 2, 'x')$q$, a), '42501');
-  perform t.eq('A inserts own pending', t.exec('authenticated', a,
-    format($q$insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players) values (%L, 'a-second', 'n', 'd', 'h', 'https://x.com', 1, 2)$q$, a)), 1);
-  perform t.eq('A deletes own row', t.exec('authenticated', a, $q$delete from submissions where slug = 'a-second'$q$), 1);
-  -- Duplicate slug through the client path is 23505 as well. A has 3 creations in 24 hours by now, so age them first.
-  update submission_creations set created_at = now() - interval '2 days' where owner_id = a;
-  perform t.expect('A duplicate slug', 'authenticated', a,
-    format($q$insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players) values (%L, 'b-pending', 'n', 'd', 'h', 'https://x.com', 1, 2)$q$, a), '23505');
+  perform t.expect('A edits own pending', 'authenticated', a, format($q$update submissions set name = 'Mine' where id = %L$q$, a_pending), '42501');
+  perform t.expect('A edit sends approved row back to pending', 'authenticated', a,
+    format($q$update submissions set name = 'Edited', status = 'pending' where id = %L$q$, a_approved), '42501');
+  perform t.expect('A status to approved', 'authenticated', a, format($q$update submissions set status = 'approved' where id = %L$q$, a_pending), '42501');
+  perform t.expect('A review_note', 'authenticated', a, format($q$update submissions set review_note = 'x' where id = %L$q$, a_pending), '42501');
+  perform t.expect('A reviewed_by', 'authenticated', a, format($q$update submissions set reviewed_by = %L where id = %L$q$, a, a_pending), '42501');
+  perform t.expect('A owner_id', 'authenticated', a, format($q$update submissions set owner_id = %L where id = %L$q$, b, a_pending), '42501');
+  perform t.expect('A update B row', 'authenticated', a, format($q$update submissions set name = 'Hacked' where id = %L$q$, b_pending), '42501');
+  perform t.expect('A deletes own row', 'authenticated', a, format('delete from submissions where id = %L', a_pending), '42501');
+  perform t.expect('A deletes B row', 'authenticated', a, format('delete from submissions where id = %L', b_pending), '42501');
+  perform t.eq('no row was changed', (select count(*) from submissions where name in ('Mine', 'Edited', 'Hacked')), 0);
+  perform t.eq('four rows still there', (select count(*) from submissions where id in (a_pending, a_approved, b_pending, b_approved)), 4);
 
   -- Profiles, as clients.
   perform t.eq('A updates own display_name', t.exec('authenticated', a, format($q$update profiles set display_name = 'New name' where id = %L$q$, a)), 1);
@@ -313,25 +317,22 @@ begin
 
   -- Pending cap on insert. The five rows are two days old, so the daily cap does not interfere.
   for i in 1..5 loop perform t.sub(p, 'p-' || i, 'pending', interval '2 days'); end loop;
-  perform t.expect('6th pending insert (authenticated)', 'authenticated', p, format(ins, p, 'p-6'), 'P0001', 'pending_limit');
   perform t.expect('6th pending insert (service_role)', 'service_role', null, format(ins, p, 'p-6'), 'P0001', 'pending_limit');
   perform t.expect('6th pending insert (superuser)', 'postgres', null, format(ins, p, 'p-6'), 'P0001', 'pending_limit');
   perform t.eq('pending stays 5', (select count(*) from submissions where owner_id = p and status = 'pending'), 5);
   -- A non-pending insert is not blocked by the pending cap.
   perform t.eq('rejected insert allowed at 5 pending', t.exec('service_role', null, format($q$insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players, status) values (%L, 'p-rej', 'n', 'd', 'h', 'https://x.com', 1, 2, 'rejected')$q$, p)), 1);
   -- Editing a pending row keeps it pending and is allowed at the cap.
-  perform t.eq('pending content edit allowed at the cap', t.exec('authenticated', p, $q$update submissions set name = 'same' where slug = 'p-1'$q$), 1);
+  perform t.eq('pending content edit allowed at the cap', t.exec('service_role', null, $q$update submissions set name = 'same' where slug = 'p-1'$q$), 1);
 
   -- Daily cap. Three rows in the last 24 hours, none pending.
   for i in 1..3 loop perform t.sub(d, 'd-' || i, 'rejected'); end loop;
-  perform t.expect('4th insert in 24 hours (authenticated)', 'authenticated', d, format(ins, d, 'd-4'), 'P0001', 'daily_limit');
   perform t.expect('4th insert in 24 hours (service_role)', 'service_role', null, format(ins, d, 'd-4'), 'P0001', 'daily_limit');
   perform t.expect('4th insert in 24 hours (rejected status)', 'service_role', null,
     format($q$insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players, status) values (%L, 'd-5', 'n', 'd', 'h', 'https://x.com', 1, 2, 'rejected')$q$, d), 'P0001', 'daily_limit');
   perform t.eq('daily count stays 3', (select count(*) from submissions where owner_id = d), 3);
   -- Deleting the rows does not free the slots: the cap counts creations, not surviving rows.
-  perform t.eq('owner deletes own rows', t.exec('authenticated', d, 'delete from submissions'), 3);
-  perform t.expect('delete then insert (authenticated)', 'authenticated', d, format(ins, d, 'd-4'), 'P0001', 'daily_limit');
+  perform t.eq('service role deletes the rows', t.exec('service_role', null, format('delete from submissions where owner_id = %L', d)), 3);
   perform t.expect('delete then insert (service_role)', 'service_role', null, format(ins, d, 'd-4'), 'P0001', 'daily_limit');
   perform t.eq('creations kept after delete', (select count(*) from submission_creations where owner_id = d), 3);
   -- The record is append-only and closed to clients.
@@ -343,22 +344,20 @@ begin
   -- Creations older than 24 hours stop counting.
   update submission_creations set created_at = now() - interval '25 hours'
     where ctid = (select ctid from submission_creations where owner_id = d limit 1);
-  perform t.eq('insert allowed once a creation is older than 24 hours', t.exec('authenticated', d, format(ins, d, 'd-4')), 1);
-  perform t.expect('and the next one is refused again', 'authenticated', d, format(ins, d, 'd-5'), 'P0001', 'daily_limit');
+  perform t.eq('insert allowed once a creation is older than 24 hours', t.exec('service_role', null, format(ins, d, 'd-4')), 1);
+  perform t.expect('and the next one is refused again', 'service_role', null, format(ins, d, 'd-5'), 'P0001', 'daily_limit');
 
   -- Editing an approved or rejected row back to pending is capped.
   for i in 1..5 loop perform t.sub(e, 'e-' || i, 'pending', interval '2 days'); end loop;
   approved_id := t.sub(e, 'e-approved', 'approved', interval '2 days');
   perform t.sub(e, 'e-rejected', 'rejected', interval '2 days');
-  perform t.expect('approved to pending at 5 pending (authenticated)', 'authenticated', e,
-    format($q$update submissions set status = 'pending', name = 'again' where id = %L$q$, approved_id), 'P0001', 'pending_limit');
   perform t.expect('approved to pending at 5 pending (service_role)', 'service_role', null,
     format($q$update submissions set status = 'pending' where id = %L$q$, approved_id), 'P0001', 'pending_limit');
   perform t.expect('rejected to pending at 5 pending (service_role)', 'service_role', null,
     $q$update submissions set status = 'pending' where slug = 'e-rejected'$q$, 'P0001', 'pending_limit');
   perform t.eq('status unchanged after refusal', (select count(*) from submissions where id = approved_id and status = 'approved'), 1);
   perform t.eq('approved to pending allowed at 4 pending', t.exec('postgres', null, $q$delete from submissions where slug = 'e-1'$q$), 1);
-  perform t.eq('approved to pending allowed at 4 pending (update)', t.exec('authenticated', e,
+  perform t.eq('approved to pending allowed at 4 pending (update)', t.exec('service_role', null,
     format($q$update submissions set status = 'pending', name = 'again' where id = %L$q$, approved_id)), 1);
   perform t.eq('pending is 5 again', (select count(*) from submissions where owner_id = e and status = 'pending'), 5);
 
@@ -383,7 +382,7 @@ begin
 
   -- One INSERT ... SELECT that would pass the cap partway fails as a whole and inserts nothing.
   for i in 1..3 loop perform t.sub(m, 'm-' || i, 'pending', interval '2 days'); end loop;
-  perform t.expect('multi-row insert over the pending cap', 'authenticated', m,
+  perform t.expect('multi-row insert over the pending cap', 'service_role', null,
     format($q$insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players)
               select %L, 'm-new-' || g, 'n', 'd', 'h', 'https://x.com', 1, 2 from generate_series(1, 3) g$q$, m), 'P0001', 'pending_limit');
   perform t.eq('nothing inserted', (select count(*) from submissions where owner_id = m), 3);
@@ -391,7 +390,7 @@ begin
   perform t.expect('multi-row insert over the daily cap', 'service_role', null,
     format($q$insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players, status)
               select %L, 'm-rej-' || g, 'n', 'd', 'h', 'https://x.com', 1, 2, 'rejected' from generate_series(1, 4) g$q$, m), 'P0001', 'daily_limit');
-  perform t.eq('multi-row insert within the cap', t.exec('authenticated', m,
+  perform t.eq('multi-row insert within the cap', t.exec('service_role', null,
     format($q$insert into submissions (owner_id, slug, name, description, how_it_was_made, play_url, min_players, max_players)
               select %L, 'm-ok-' || g, 'n', 'd', 'h', 'https://x.com', 1, 2 from generate_series(1, 2) g$q$, m)), 2);
 

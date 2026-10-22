@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { firstPartyIds } from '../_first-party.js';
 import { requireVerified } from '../../server/auth.mjs';
-import { triggerRebuild } from '../../server/deploy.mjs';
+import { hookRebuild } from '../../server/deploy.mjs';
 import { InvalidJson, PayloadTooLarge, readJson, send } from '../../server/http.mjs';
 import { deleteSubmission, getOwnSubmission, submissionInput, updateSubmission } from '../../server/submissions.mjs';
 import { createStore } from '../../server/store.mjs';
@@ -32,8 +33,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     if (!('user' in auth)) return send(res, auth.status, { ok: false, error: auth.error });
     const store = createStore(serviceClient({ url, serviceKey }));
     const id = idFrom(req);
-    // The hook URL is read here and never returned or logged. triggerRebuild's errors do not include it.
-    const rebuild = () => triggerRebuild({ hookUrl: process.env.DEPLOY_HOOK_URL });
+    // The hook URL is read here and never returned or logged. The logic runs every rebuild through rebuildForClient.
+    const rebuild = hookRebuild(process.env.DEPLOY_HOOK_URL);
 
     if (method === 'GET') {
       const result = await getOwnSubmission({ store, ownerId: auth.user.id, id });
@@ -62,6 +63,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       input: submissionInput(body),
       now: Date.now(),
       rebuild,
+      // Both are read here, so the logic never touches the file system or the environment.
+      firstPartyIds: firstPartyIds(),
+      blobHost: process.env.BLOB_PUBLIC_HOST,
     });
     if (!result.ok) return send(res, result.status, { ok: false, error: result.error });
     return send(res, 200, {

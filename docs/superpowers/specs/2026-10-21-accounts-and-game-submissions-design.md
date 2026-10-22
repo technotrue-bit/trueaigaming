@@ -84,7 +84,7 @@ Each decision has a recommendation. Please confirm or change them.
 - `reviewed_by` uuid, optional
 - `reviewed_at`, `created_at`, `updated_at` timestamps
 
-**Row-level security.** Anyone can read profile handles and display names. Anyone can read approved submissions. Owners can read and write their own rows, but they can't change `status`, `review_note` or the review fields. Only the server, using the service role, changes those.
+**Row-level security.** Anyone can read profile handles and display names. Anyone can read approved submissions. Owners can read their own rows. Only the server, using the service role, writes submissions and changes `status`, `review_note` and the review fields. The `authenticated` role has no INSERT, UPDATE or DELETE grant on `submissions` at all: the API is the only writer, through the service role, and the browser only reads.
 
 ## Link and content rules
 

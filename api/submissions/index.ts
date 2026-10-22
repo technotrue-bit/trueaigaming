@@ -1,7 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { firstPartyIds } from '../_first-party.js';
 import { requireVerified } from '../../server/auth.mjs';
 import { InvalidJson, PayloadTooLarge, readJson, send } from '../../server/http.mjs';
-import { createSubmission, submissionInput } from '../../server/submissions.mjs';
+import { createSubmission, listOwnSubmissions, submissionInput } from '../../server/submissions.mjs';
 import { createStore } from '../../server/store.mjs';
 import { serviceClient } from '../../server/supabase.mjs';
 
@@ -26,7 +27,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const store = createStore(serviceClient({ url, serviceKey }));
 
     if (method === 'GET') {
-      const submissions = await store.listOwnSubmissions(auth.user.id);
+      const submissions = await listOwnSubmissions({ store, ownerId: auth.user.id });
       return send(res, 200, { ok: true, submissions });
     }
 
@@ -43,6 +44,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       ownerId: auth.user.id,
       input: submissionInput(body),
       now: Date.now(),
+      // Both are read here, so the logic never touches the file system or the environment.
+      firstPartyIds: firstPartyIds(),
+      blobHost: process.env.BLOB_PUBLIC_HOST,
     });
     if (!result.ok) return send(res, result.status, { ok: false, error: result.error });
     return send(res, 201, { ok: true, submission: result.value });

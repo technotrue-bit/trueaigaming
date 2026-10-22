@@ -28,7 +28,8 @@ export async function triggerRebuild({ hookUrl, fetchImpl = fetch }) {
 
 /**
  * The rebuild a route passes to the logic. The route reads the hook URL from the environment and passes it here, so
- * no route calls triggerRebuild itself. The logic runs the result through rebuildForClient.
+ * no route calls triggerRebuild itself. Every rebuild reaches a client through rebuildForClient: the logic runs it,
+ * and api/profile.ts wraps it, because deleteAccount calls its rebuild directly.
  * @param {string | undefined} hookUrl
  * @returns {() => Promise<RebuildResult>}
  */

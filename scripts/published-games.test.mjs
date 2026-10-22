@@ -144,6 +144,34 @@ test('PUBLISHED_GAMES_JSON reads the fixture rows instead of Supabase', async ()
   assert.equal(games[0].thumbnail, PLACEHOLDER);
 });
 
+test('PUBLISHED_GAMES_JSON is ignored in production: the loader throws instead of reading a fixture', async () => {
+  const env = { SUBMISSIONS_ENABLED: 'true', PUBLISHED_GAMES_JSON: FIXTURE, VERCEL_ENV: 'production' };
+  await assert.rejects(
+    loadPublishedGames({ env, fetchRows: neverFetch, existingIds: [] }),
+    { message: 'PUBLISHED_GAMES_JSON must not be set in production' },
+  );
+  // Other environments, and a disabled flag, are not affected.
+  const preview = { ...env, VERCEL_ENV: 'preview' };
+  assert.equal((await loadPublishedGames({ env: preview, fetchRows: neverFetch, existingIds: [] })).length, 1);
+  assert.deepEqual(await loadPublishedGames({ env: { ...env, SUBMISSIONS_ENABLED: 'false' }, fetchRows: neverFetch, existingIds: [] }), []);
+});
+
+test('BLOB_PUBLIC_HOST: an approved row with a thumbnail from another host throws', async () => {
+  const host = 'abc123.public.blob.vercel-storage.com';
+  const env = { ...enabled, BLOB_PUBLIC_HOST: host };
+  const own = withFields({ thumbnail_url: `https://${host}/pie.png` });
+  const games = await loadPublishedGames({ env, fetchRows: fakeFetch([own]).fetchRows, existingIds: [] });
+  assert.equal(games[0].thumbnail, `https://${host}/pie.png`);
+
+  // The row fixture's own thumbnail is on abc.public.blob..., not the configured store.
+  await assert.rejects(
+    loadPublishedGames({ env, fetchRows: fakeFetch([row]).fetchRows, existingIds: [] }),
+    { message: /Published submission "pie-flick" is invalid: Thumbnail must be hosted on Vercel Blob/ },
+  );
+  // Without the variable the generic rule applies.
+  assert.equal((await loadPublishedGames({ env: enabled, fetchRows: fakeFetch([row]).fetchRows, existingIds: [] })).length, 1);
+});
+
 test('Supabase URL and service key come from the env argument and go to fetchRows', async () => {
   const { fetchRows, calls } = fakeFetch([]);
   assert.deepEqual(await loadPublishedGames({ env: enabled, fetchRows, existingIds: [] }), []);

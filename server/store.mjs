@@ -57,7 +57,7 @@
  * @property {(ownerId: string, iso: string) => Promise<number>} countSince
  * @property {(row: NewSubmission) => Promise<Submission>} insertSubmission
  * @property {(id: string, patch: Partial<Submission>) => Promise<Submission>} updateSubmission
- * @property {(id: string, expectedStatus: Submission['status'], patch: Partial<Submission>) => Promise<Submission | null>} updateSubmissionIfStatus Updates only a row whose status is expectedStatus. Returns null when no row matched.
+ * @property {(id: string, expected: { status: Submission['status'], updatedAt?: string }, patch: Partial<Submission>) => Promise<Submission | null>} updateSubmissionIf Updates only a row whose status is expected.status and, when expected.updatedAt is given, whose updated_at equals it. Returns null when no row matched.
  * @property {(id: string) => Promise<void>} deleteSubmission
  * @property {() => Promise<PendingSubmission[]>} listPending
  * @property {() => Promise<Submission[]>} listApproved
@@ -174,8 +174,10 @@ export function createStore(client) {
       return unwrap(await submissions().update(patch).eq('id', id).select('*').single());
     },
 
-    async updateSubmissionIfStatus(id, expectedStatus, patch) {
-      return unwrap(await submissions().update(patch).eq('id', id).eq('status', expectedStatus).select('*').maybeSingle());
+    async updateSubmissionIf(id, expected, patch) {
+      let query = submissions().update(patch).eq('id', id).eq('status', expected.status);
+      if (expected.updatedAt !== undefined) query = query.eq('updated_at', expected.updatedAt);
+      return unwrap(await query.select('*').maybeSingle());
     },
 
     async deleteSubmission(id) {
@@ -183,7 +185,8 @@ export function createStore(client) {
     },
 
     async listPending() {
-      const rows = unwrap(await submissions().select('*, profiles(handle)').eq('status', 'pending').order('created_at', { ascending: true })) ?? [];
+      // submissions has two foreign keys to profiles (owner_id and reviewed_by), so the embed names the owner key.
+      const rows = unwrap(await submissions().select('*, profiles!submissions_owner_id_fkey(handle)').eq('status', 'pending').order('created_at', { ascending: true })) ?? [];
       return rows.map(pendingRow);
     },
 

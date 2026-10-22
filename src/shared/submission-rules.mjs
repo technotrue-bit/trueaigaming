@@ -205,14 +205,19 @@ export function validatePlayers(min, max) {
 /**
  * True when the canonical form of the value (from the URL parser) matches the database rule: https, one
  * [a-z0-9-] label before .public.blob.vercel-storage.com, no port or credentials, and at most 2048 characters.
+ * When blobHost is a non-empty string (the project's own store, such as abc123.public.blob.vercel-storage.com), the
+ * host must also be exactly that one, so a thumbnail cannot point at someone else's Blob store.
  * @param {unknown} value
+ * @param {string} [blobHost]
  * @returns {boolean}
  */
-export function isBlobThumbnailUrl(value) {
+export function isBlobThumbnailUrl(value, blobHost) {
   if (typeof value !== 'string') return false;
   try {
-    const href = new URL(value).href;
-    return href.length <= MAX_URL && BLOB_URL_RE.test(href);
+    const url = new URL(value);
+    const wanted = typeof blobHost === 'string' ? blobHost.trim().toLowerCase() : '';
+    if (wanted !== '' && url.host !== wanted) return false;
+    return url.href.length <= MAX_URL && BLOB_URL_RE.test(url.href);
   } catch {
     return false;
   }
@@ -221,11 +226,13 @@ export function isBlobThumbnailUrl(value) {
 /**
  * A whole game submission. Name, game address, description, how it was made, play link and player
  * range are required. Source link and thumbnail are optional: blank gives null. The first failing
- * field's message is returned.
+ * field's message is returned. options.blobHost, when set, is the one Blob host a thumbnail may use (see
+ * isBlobThumbnailUrl).
  * @param {unknown} input
+ * @param {{ blobHost?: string }} [options]
  * @returns {Result<SubmissionFields>}
  */
-export function validateSubmission(input) {
+export function validateSubmission(input, options = {}) {
   if (typeof input !== 'object' || input === null) return { ok: false, error: 'Submission must be an object' };
   const fields = /** @type {Record<string, unknown>} */ (input);
 
@@ -253,7 +260,7 @@ export function validateSubmission(input) {
   if (!isBlank(fields.thumbnailUrl)) {
     const thumbnail = checkHttpsUrl(fields.thumbnailUrl, 'Thumbnail');
     if (!thumbnail.ok) return thumbnail;
-    if (!isBlobThumbnailUrl(thumbnail.value)) return { ok: false, error: 'Thumbnail must be hosted on Vercel Blob' };
+    if (!isBlobThumbnailUrl(thumbnail.value, options.blobHost)) return { ok: false, error: 'Thumbnail must be hosted on Vercel Blob' };
     thumbnailUrl = thumbnail.value;
   }
 

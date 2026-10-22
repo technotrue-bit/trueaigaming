@@ -47,7 +47,7 @@ function rawSlug(row) {
 }
 
 /**
- * The owner's profile from the row's embedded profiles(handle, display_name), or {} when there is none.
+ * The owner's profile from the row's embedded profiles(handle, display_name) (the embed names the owner key, because submissions has two keys to profiles), or {} when there is none.
  * @param {unknown} row
  * @returns {{ handle?: unknown, display_name?: unknown }}
  */
@@ -58,12 +58,14 @@ function profileOf(row) {
 
 /**
  * One approved row as a Game. The row is checked with validateSubmission first, and a row that fails throws, so the
- * build never drops a game silently. The Game takes the checked values, not the raw row.
+ * build never drops a game silently. The Game takes the checked values, not the raw row. When blobHost is set, a
+ * thumbnail on any other host makes the row invalid, so the build fails rather than publish it.
  * @param {unknown} row
+ * @param {{ blobHost?: string }} [options]
  * @returns {ExternalGame}
  */
-export function submissionToGame(row) {
-  const checked = validateSubmission(rowInput(row));
+export function submissionToGame(row, options = {}) {
+  const checked = validateSubmission(rowInput(row), options);
   if (!checked.ok) throw new Error(`Published submission "${rawSlug(row)}" is invalid: ${checked.error}`);
   const fields = checked.value;
 
@@ -101,7 +103,7 @@ async function fetchApprovedRows({ url, serviceKey }) {
   const { serviceClient } = await import('../server/supabase.mjs');
   const { data, error, count } = await serviceClient({ url, serviceKey })
     .from('submissions')
-    .select('slug, name, description, how_it_was_made, play_url, source_url, thumbnail_url, min_players, max_players, profiles(handle, display_name)', { count: 'exact' })
+    .select('slug, name, description, how_it_was_made, play_url, source_url, thumbnail_url, min_players, max_players, profiles!submissions_owner_id_fkey(handle, display_name)', { count: 'exact' })
     .eq('status', 'approved')
     .order('created_at', { ascending: true });
   return { data, error, count };
@@ -126,8 +128,10 @@ function rowsFromReply(reply) {
 /**
  * Every approved submission as a Game, for the build. Returns [] unless SUBMISSIONS_ENABLED is 'true'.
  * Rows come from the file named by PUBLISHED_GAMES_JSON when it is set, otherwise from fetchRows, which gets the
- * Supabase URL and service key and returns a reply { data, error, count }. A reply with an error, no data, or fewer
+ * Supabase URL and service key and returns a reply { data, error, count }. PUBLISHED_GAMES_JSON is for build checks
+ * only: with VERCEL_ENV 'production' the loader throws instead of reading it. A reply with an error, no data, or fewer
  * rows than its count throws. A bad row, or a slug that collides with games.json or with another row, throws.
+ * BLOB_PUBLIC_HOST, when set, is the one host a thumbnail may use, and a row with another host throws.
  * @param {{
  *   env: Record<string, string | undefined>,
  *   fetchRows?: (config: SupabaseConfig) => Promise<unknown>,
@@ -141,6 +145,7 @@ export async function loadPublishedGames({ env, fetchRows = fetchApprovedRows, e
   /** @type {unknown} */
   let rows;
   if (env.PUBLISHED_GAMES_JSON) {
+    if (env.VERCEL_ENV === 'production') throw new Error('PUBLISHED_GAMES_JSON must not be set in production');
     rows = JSON.parse(readFileSync(resolve(env.PUBLISHED_GAMES_JSON), 'utf8'));
   } else {
     const url = env.SUPABASE_URL;
@@ -155,7 +160,7 @@ export async function loadPublishedGames({ env, fetchRows = fetchApprovedRows, e
   /** @type {ExternalGame[]} */
   const games = [];
   for (const row of rows) {
-    const game = submissionToGame(row);
+    const game = submissionToGame(row, { blobHost: env.BLOB_PUBLIC_HOST });
     if (taken.has(game.id)) throw new Error(`Submission slug "${game.id}" collides with a games.json id`);
     if (seen.has(game.id)) throw new Error(`Submission slug "${game.id}" appears more than once`);
     seen.add(game.id);

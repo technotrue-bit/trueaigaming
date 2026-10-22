@@ -14,7 +14,7 @@ import { randomUUID } from 'node:crypto';
  * @property {Array<Partial<Profile> & Pick<Profile, 'id' | 'handle'>>} [profiles]
  * @property {Array<Partial<Submission> & Pick<Submission, 'id' | 'owner_id' | 'slug'>>} [submissions]
  * @property {{ insertSubmission?: unknown, updateSubmission?: unknown }} [failures] An error to throw from
- *   insertSubmission or updateSubmission before anything changes, as the database does when a limit trigger or a
+ *   insertSubmission, updateSubmission or updateSubmissionIf before anything changes, as the database does when a limit trigger or a
  *   check constraint fires. Tests may also set `store.failures` later.
  */
 
@@ -180,9 +180,11 @@ export function createTestStore(seed = {}) {
       return { ...next };
     },
 
-    async updateSubmissionIfStatus(id, expectedStatus, patch) {
+    async updateSubmissionIf(id, expected, patch) {
+      if (failures.updateSubmission !== undefined) throw failures.updateSubmission;
       const current = state.submissions.get(id);
-      if (!current || current.status !== expectedStatus) return null;
+      if (!current || current.status !== expected.status) return null;
+      if (expected.updatedAt !== undefined && current.updated_at !== expected.updatedAt) return null;
       if (patch.slug !== undefined && slugTaken(patch.slug, id)) throw uniqueViolation('submissions');
       const next = { ...current, ...patch, updated_at: now() };
       state.submissions.set(id, next);
