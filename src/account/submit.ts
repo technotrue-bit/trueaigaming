@@ -267,10 +267,10 @@ function wire(): void {
 if (!SUBMISSIONS_ENABLED) {
   showNotice(CLOSED);
 } else {
-  // Registered before any line that can throw, so Try again and the no-post guard exist even when a later line fails.
+  // Try again is registered first. The no-post guard below uses ?. so it cannot throw when the form is missing.
   retry.addEventListener('click', () => void route());
   // The form never posts natively, so a failed wire() cannot lose typed values to a native post.
-  submitForm.addEventListener('submit', (event) => event.preventDefault());
+  submitForm?.addEventListener('submit', (event) => event.preventDefault());
   try {
     wire();
     pageHead.hidden = false;
