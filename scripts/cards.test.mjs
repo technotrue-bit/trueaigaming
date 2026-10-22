@@ -42,3 +42,12 @@ test('grid always ends with the "more games soon" placeholder', () => {
   assert.match(gridHtml([]), /class="empty"[\s\S]*card-soon/);
   assert.match(gridHtml([base]), /card-soon-text">More games soon<\/p><\/li>$/);
 });
+
+test('game page shows About and How it was made sections when set', async () => {
+  const { aboutHtml } = await import('./seo.mjs');
+  const html = aboutHtml({ ...base, about: 'A <b>fun</b> game.', howItWasMade: 'Made with AI.' });
+  assert.match(html, /<h2>About Demo<\/h2>/);
+  assert.match(html, /A &lt;b&gt;fun&lt;\/b&gt; game\./);
+  assert.match(html, /<h2>How it was made<\/h2>/);
+  assert.equal(aboutHtml(base), '');
+});
