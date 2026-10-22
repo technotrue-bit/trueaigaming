@@ -4,8 +4,8 @@ import { supabase } from './client';
 export class ApiError extends Error {
   readonly status: number;
 
-  constructor(status: number, message: string) {
-    super(message);
+  constructor(status: number, message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'ApiError';
     this.status = status;
   }
@@ -35,10 +35,17 @@ function parseJson(text: string): unknown {
  * @param init Passed to fetch. An Authorization header here is dropped, because the token always comes from the session.
  */
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  // Same-site paths only. "//host" and "/\host" are read as another origin, so the token would go there. Browsers also
+  // drop tabs and line breaks from URLs, so those are refused too. This runs before any token is read.
+  if (typeof path !== 'string' || path[0] !== '/' || path[1] === '/' || path[1] === '\\' || /[\t\n\r]/.test(path)) {
+    throw new ApiError(0, 'Invalid request path');
+  }
+
   const headers = new Headers(init.headers);
   headers.delete('Authorization');
 
-  const { data } = await supabase.auth.getSession();
+  const { data, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw new ApiError(0, 'Could not check your sign-in, try again');
   const token = data.session?.access_token;
   if (token) headers.set('Authorization', `Bearer ${token}`);
   if (typeof init.body === 'string' && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
@@ -48,8 +55,10 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   try {
     res = await fetch(path, { ...init, headers });
     text = await res.text();
-  } catch {
-    throw new ApiError(0, NETWORK_ERROR);
+  } catch (err) {
+    // A caller's abort is not a network failure, so it reaches the caller unchanged.
+    if (init.signal?.aborted) throw err;
+    throw new ApiError(0, NETWORK_ERROR, { cause: err });
   }
 
   const body = parseJson(text);
