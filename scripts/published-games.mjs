@@ -69,7 +69,7 @@ export function submissionToGame(row) {
 
   const profile = profileOf(row);
   const displayName = typeof profile.display_name === 'string' ? profile.display_name.trim() : '';
-  const handle = typeof profile.handle === 'string' ? profile.handle : '';
+  const handle = typeof profile.handle === 'string' ? profile.handle.trim() : '';
   const author = displayName || handle;
   if (!author) throw new Error(`Published submission "${fields.slug}" has no author`);
 
@@ -91,26 +91,43 @@ export function submissionToGame(row) {
 }
 
 /**
- * Approved rows with the owner's handle and display name. Used only when SUBMISSIONS_ENABLED is 'true' and no
+ * Approved rows with the owner's handle and display name, as the Supabase reply { data, error, count }. The exact
+ * count lets rowsFromReply catch a server-side row cap. Used only when SUBMISSIONS_ENABLED is 'true' and no
  * PUBLISHED_GAMES_JSON file is set. The client module is imported here, so it never loads during tests.
  * @param {SupabaseConfig} config
  * @returns {Promise<unknown>}
  */
 async function fetchApprovedRows({ url, serviceKey }) {
   const { serviceClient } = await import('../server/supabase.mjs');
-  const { data, error } = await serviceClient({ url, serviceKey })
+  const { data, error, count } = await serviceClient({ url, serviceKey })
     .from('submissions')
-    .select('slug, name, description, how_it_was_made, play_url, source_url, thumbnail_url, min_players, max_players, profiles(handle, display_name)')
+    .select('slug, name, description, how_it_was_made, play_url, source_url, thumbnail_url, min_players, max_players, profiles(handle, display_name)', { count: 'exact' })
     .eq('status', 'approved')
     .order('created_at', { ascending: true });
-  if (error) throw new Error(`Could not load approved submissions: ${error.message}`);
-  return data ?? [];
+  return { data, error, count };
+}
+
+/**
+ * The rows from a Supabase reply. An error, a null body, or fewer rows than the reported count throws, so a game
+ * is never dropped without an error.
+ * @param {unknown} reply
+ * @returns {unknown[]}
+ */
+function rowsFromReply(reply) {
+  const { data, error, count } = /** @type {{ data?: unknown, error?: { message?: unknown } | null, count?: unknown }} */ (reply ?? {});
+  if (error) throw new Error(`Could not load approved submissions: ${String(error.message)}`);
+  if (data === null) throw new Error('Could not load approved submissions: the reply had no data');
+  if (!Array.isArray(data)) throw new Error('Published submissions must be an array of rows');
+  if (typeof count !== 'number') throw new Error('Could not load approved submissions: the reply had no row count');
+  if (data.length < count) throw new Error(`Could not load approved submissions: got ${data.length} of ${count} rows`);
+  return data;
 }
 
 /**
  * Every approved submission as a Game, for the build. Returns [] unless SUBMISSIONS_ENABLED is 'true'.
  * Rows come from the file named by PUBLISHED_GAMES_JSON when it is set, otherwise from fetchRows, which gets the
- * Supabase URL and service key. A bad row, or a slug that collides with games.json or with another row, throws.
+ * Supabase URL and service key and returns a reply { data, error, count }. A reply with an error, no data, or fewer
+ * rows than its count throws. A bad row, or a slug that collides with games.json or with another row, throws.
  * @param {{
  *   env: Record<string, string | undefined>,
  *   fetchRows?: (config: SupabaseConfig) => Promise<unknown>,
@@ -129,7 +146,7 @@ export async function loadPublishedGames({ env, fetchRows = fetchApprovedRows, e
     const url = env.SUPABASE_URL;
     const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !serviceKey) throw new Error(MISSING_SUPABASE);
-    rows = await fetchRows({ url, serviceKey });
+    rows = rowsFromReply(await fetchRows({ url, serviceKey }));
   }
   if (!Array.isArray(rows)) throw new Error('Published submissions must be an array of rows');
 

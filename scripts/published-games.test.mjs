@@ -31,13 +31,13 @@ const enabled = {
   SUPABASE_SERVICE_ROLE_KEY: 'service-key-test',
 };
 
-/** A fetchRows fake that returns the rows and records each call's config. */
+/** A fetchRows fake that returns the rows as a complete Supabase reply and records each call's config. */
 function fakeFetch(/** @type {unknown[]} */ rows) {
   /** @type {unknown[]} */
   const calls = [];
   const fetchRows = async (/** @type {unknown} */ config) => {
     calls.push(config);
-    return rows;
+    return { data: rows, error: null, count: rows.length };
   };
   return { fetchRows, calls };
 }
@@ -165,12 +165,44 @@ test('rows that are not an array throw', async () => {
   );
 });
 
+test('a Supabase reply with a null body throws instead of becoming an empty list', async () => {
+  await assert.rejects(
+    loadPublishedGames({ env: enabled, fetchRows: async () => ({ data: null, error: null, count: null }), existingIds: [] }),
+    { message: 'Could not load approved submissions: the reply had no data' },
+  );
+});
+
+test('a reply with fewer rows than its count throws, so a server row cap cannot drop games', async () => {
+  await assert.rejects(
+    loadPublishedGames({ env: enabled, fetchRows: async () => ({ data: [row], error: null, count: 2 }), existingIds: [] }),
+    { message: 'Could not load approved submissions: got 1 of 2 rows' },
+  );
+});
+
+test('a reply with an error throws with the error message only', async () => {
+  await assert.rejects(
+    loadPublishedGames({
+      env: enabled,
+      fetchRows: async () => ({ data: null, error: { message: 'permission denied' }, count: null }),
+      existingIds: [],
+    }),
+    { message: 'Could not load approved submissions: permission denied' },
+  );
+});
+
 // ---------- Row mapping ----------
 
 test('author is the display name, or the handle when the name is blank', () => {
   assert.equal(submissionToGame(row).author, 'Pie Dev');
   assert.equal(submissionToGame(withFields({ profiles: { handle: 'pie-dev', display_name: null } })).author, 'pie-dev');
   assert.equal(submissionToGame(withFields({ profiles: { handle: 'pie-dev', display_name: '   ' } })).author, 'pie-dev');
+});
+
+test('a blank handle with no display name has no author and throws', () => {
+  assert.throws(
+    () => submissionToGame(withFields({ profiles: { handle: '   ', display_name: null } })),
+    { message: 'Published submission "pie-flick" has no author' },
+  );
 });
 
 test('a row without a profile throws', () => {
