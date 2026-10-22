@@ -198,3 +198,23 @@ test('deleteAccount still rebuilds when a step after the approved game fails, so
   assert.equal(calls.length, 1);
   assert.equal(store.state.submissions.size, 0);
 });
+
+test('deleteAccount rebuilds when a delete commits and then throws, so the removed approved game leaves the site', async () => {
+  const store = createTestStore({
+    profiles: [{ id: 'user-1', handle: 'ada', display_name: 'Ada' }],
+    submissions: [{ id: 's1', owner_id: 'user-1', slug: 'one-game', status: 'approved' }],
+  });
+  // The delete reaches the database, then the reply is lost.
+  const lostReply = {
+    ...store,
+    deleteSubmission: async (id) => {
+      await store.deleteSubmission(id);
+      throw new Error('response lost');
+    },
+  };
+  const { calls, rebuild } = rebuildSpy();
+
+  await assert.rejects(deleteAccount({ store: lostReply, user: user('user-1'), rebuild }), /response lost/);
+  assert.equal(calls.length, 1);
+  assert.equal(store.state.submissions.has('s1'), false);
+});

@@ -101,8 +101,9 @@ export async function deleteAccount({ store, user, rebuild }) {
   let rebuildResult = null;
   try {
     for (const submission of await store.listOwnSubmissions(user.id)) {
-      await store.deleteSubmission(submission.id);
+      // Set before the delete: a delete can commit and then throw, and the retry no longer lists that row.
       if (submission.status === 'approved') approvedRemoved = true;
+      await store.deleteSubmission(submission.id);
     }
     await store.deleteProfile(user.id);
     await store.deleteAuthUser(user.id);
