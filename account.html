@@ -113,9 +113,11 @@
   </head>
   <body>
     <main id="account" class="wrap account">
-      <p class="account-back"><a href="/">Back to games</a></p>
-      <h1 class="account-title">Account</h1>
-      <p id="notice" class="account-notice" role="status" aria-live="polite">Loading&hellip;</p>
+      <div id="page-head" hidden>
+        <p class="account-back"><a href="/">Back to games</a></p>
+        <h1 class="account-title">Account</h1>
+      </div>
+      <p id="notice" class="account-notice" role="status" aria-live="polite" hidden></p>
       <button id="retry" class="btn btn-ghost" type="button" hidden>Try again</button>
 
       <section id="signed-out" class="account-panel" aria-labelledby="signup-title" hidden>
@@ -193,6 +195,21 @@
           </label>
           <button id="handle-save" class="btn btn-primary" type="submit">Save handle</button>
           <p id="handle-status" class="account-status" role="status"></p>
+        </form>
+        <div class="account-actions">
+          <button id="handle-sign-out" class="btn btn-ghost" type="button">Sign out</button>
+        </div>
+      </section>
+
+      <section id="new-password" class="account-panel" aria-labelledby="new-password-title" hidden>
+        <h2 id="new-password-title">Set a new password</h2>
+        <form id="new-password-form" class="account-form">
+          <label class="account-label">
+            New password (at least 12 characters)
+            <input name="password" type="password" required autocomplete="new-password" />
+          </label>
+          <button id="new-password-save" class="btn btn-primary" type="submit">Save password</button>
+          <p id="new-password-status" class="account-status" role="status"></p>
         </form>
       </section>
     </main>

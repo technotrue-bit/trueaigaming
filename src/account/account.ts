@@ -4,11 +4,12 @@ import { ApiError, apiFetch } from './api';
 import { SUBMISSIONS_ENABLED, supabase } from './client';
 
 const CLOSED = 'Submissions are not open yet';
+const LOADING = 'Loading…';
 const FALLBACK = 'Something went wrong, try again.';
 const DELETE_CONFIRM = "Delete your account and all your games? This can't be undone.";
 
-type Screen = 'signed-out' | 'unverified' | 'verified' | 'handle-setup';
-const SCREENS: Screen[] = ['signed-out', 'unverified', 'verified', 'handle-setup'];
+type Screen = 'signed-out' | 'unverified' | 'verified' | 'handle-setup' | 'new-password';
+const SCREENS: Screen[] = ['signed-out', 'unverified', 'verified', 'handle-setup', 'new-password'];
 
 /** The profile routes reply with { ok: true, profile } for GET and POST. */
 interface ProfileReply {
@@ -19,8 +20,12 @@ interface ProfileReply {
 /** The address the verify panel resends to. Kept in memory only. */
 let pendingEmail = '';
 
+/** True from a password-reset link until a new password is saved. While it is set, only the new-password screen shows. */
+let recovering = false;
+
 const byId = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
+const pageHead = byId<HTMLElement>('page-head');
 const notice = byId<HTMLParagraphElement>('notice');
 const retry = byId<HTMLButtonElement>('retry');
 const handleText = byId<HTMLElement>('handle');
@@ -35,12 +40,16 @@ const signOutBtn = byId<HTMLButtonElement>('sign-out');
 const deleteBtn = byId<HTMLButtonElement>('delete');
 const handleForm = byId<HTMLFormElement>('handle-form');
 const handleSave = byId<HTMLButtonElement>('handle-save');
+const handleSignOut = byId<HTMLButtonElement>('handle-sign-out');
+const newPasswordForm = byId<HTMLFormElement>('new-password-form');
+const newPasswordSave = byId<HTMLButtonElement>('new-password-save');
 const statusEls = {
   signup: byId<HTMLElement>('signup-status'),
   signin: byId<HTMLElement>('signin-status'),
   unverified: byId<HTMLElement>('unverified-status'),
   verified: byId<HTMLElement>('verified-status'),
   handle: byId<HTMLElement>('handle-status'),
+  newPassword: byId<HTMLElement>('new-password-status'),
 };
 
 /** Text of one form field, as typed. */
@@ -62,13 +71,15 @@ function showNotice(text: string, canRetry = false): void {
 
 /** Shows one panel and hides the rest. Panel messages are cleared, since they belong to the panel they were shown in. */
 function showScreen(screen: Screen | null): void {
+  // During a password reset only the new-password panel may show, so a load that finishes late cannot replace it.
+  if (recovering && screen !== 'new-password') return;
   for (const id of SCREENS) byId<HTMLElement>(id).hidden = id !== screen;
   for (const el of Object.values(statusEls)) setStatus(el, '');
 }
 
 /**
- * Rule 1: an ApiError message is safe to show. Anything else, such as a Supabase error or the missing-config error (which
- * names VITE_ variables), gets the fixed text.
+ * An ApiError message is written for people to read, so it is shown as it is. Anything else, such as a Supabase error or
+ * the missing-config error (which names VITE_ variables), gets the fixed text.
  */
 function messageFor(err: unknown): string {
   return err instanceof ApiError ? err.message : FALLBACK;
@@ -97,7 +108,7 @@ function showUnverified(email: string): void {
   showScreen('unverified');
 }
 
-/** Loads the profile. A 409 means no usable handle yet, so the handle form appears. Any other failure shows the fixed text. */
+/** Loads the profile. A 409 means no usable handle yet, so the handle form appears. Other failures show their message in the notice. */
 async function showVerified(): Promise<void> {
   let reply: ProfileReply;
   try {
@@ -108,7 +119,7 @@ async function showVerified(): Promise<void> {
       return;
     }
     showScreen(null);
-    showNotice(FALLBACK, true);
+    showNotice(messageFor(err), true);
     return;
   }
   handleText.textContent = reply.profile.handle;
@@ -121,6 +132,7 @@ async function route(): Promise<void> {
     const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
     showNotice('');
+    if (recovering) return;
     const user = data.session?.user;
     if (!user) {
       showScreen('signed-out');
@@ -146,6 +158,13 @@ function signOutFrom(control: HTMLButtonElement, out: HTMLElement): void {
 }
 
 function wire(): void {
+  // Registered before the first route(), so a password-reset event during session setup is not missed.
+  supabase.auth.onAuthStateChange((event) => {
+    if (event !== 'PASSWORD_RECOVERY') return;
+    recovering = true;
+    showScreen('new-password');
+  });
+
   signupForm.addEventListener('submit', (event) => {
     event.preventDefault();
     if (!signupForm.reportValidity()) return;
@@ -219,10 +238,14 @@ function wire(): void {
     if (!window.confirm(DELETE_CONFIRM)) return;
     void attempt(deleteBtn, statusEls.verified, async () => {
       await apiFetch('/api/profile', { method: 'DELETE' });
-      // The account is gone on the server. Clear this browser's session. supabase-js clears it even when the call fails,
-      // so the result is not checked: a failure here must not read as a failed delete. route() then sees no session.
-      await supabase.auth.signOut({ scope: 'local' });
+      // The account is gone on the server. Clear this browser's session. supabase-js (auth-js 2.118) removes the local session
+      // even when the server sign-out fails, and then returns that error. Show it after route() has run.
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
       await route();
+      if (error) {
+        showNotice(FALLBACK);
+        return;
+      }
       showNotice('Your account and games were deleted.');
     });
   });
@@ -245,13 +268,36 @@ function wire(): void {
     });
   });
 
+  handleSignOut.addEventListener('click', () => signOutFrom(handleSignOut, statusEls.handle));
+
+  newPasswordForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (!newPasswordForm.reportValidity()) return;
+    const result = validatePassword(fieldValue(newPasswordForm, 'password'));
+    if (!result.ok) {
+      setStatus(statusEls.newPassword, result.error, true);
+      return;
+    }
+    const password = result.value;
+    void attempt(newPasswordSave, statusEls.newPassword, async () => {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      recovering = false;
+      await route();
+      // route() clears the notice and the panel messages, so this line goes last.
+      showNotice('Password updated.');
+    });
+  });
+
   retry.addEventListener('click', () => void route());
 }
 
-// Rule 3: the flag is checked first. When it is off, the only thing shown is the notice.
+// The flag is checked before anything else. When it is off, the only thing shown is the notice.
 if (!SUBMISSIONS_ENABLED) {
   showNotice(CLOSED);
 } else {
+  pageHead.hidden = false;
+  showNotice(LOADING);
   wire();
   void route();
 }
