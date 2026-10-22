@@ -125,6 +125,16 @@ test('loadGames rejects a blob thumbnail that carries credentials, and never ech
   assert.ok(!JSON.stringify(warn.mock.calls.map((c) => c.arguments)).includes('pw'));
 });
 
+test('the skip warning for an entry with no id or name never prints the raw entry', (t) => {
+  const warn = t.mock.method(console, 'warn', () => {});
+  const unnamed = { thumbnail: CREDENTIALED, playUrl: 'https://ext.example/play', status: 'live' };
+  assert.deepEqual(loadGames(gamesFile(t, [unnamed])), []);
+  assert.equal(warn.mock.callCount(), 1);
+  const printed = JSON.stringify(warn.mock.calls.map((c) => c.arguments));
+  assert.ok(!printed.includes('user'));
+  assert.ok(!printed.includes('pw'));
+});
+
 /** src/games.ts with no bundler: type-stripped, its CSS import dropped and its shared import pointed at the file. */
 async function importBrowserGames() {
   const shared = pathToFileURL(join(ROOT, 'src/shared/submission-rules.mjs')).href;

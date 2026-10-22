@@ -122,7 +122,8 @@ export function loadGames(file = join(ROOT, 'public/games.json')) {
     const thumbnail = safeThumbnail(r.thumbnail);
     // Skipped exactly like src/games.ts skips them, so the prerendered grid matches the JS one.
     if (!isNonEmptyString(r.id) || !isNonEmptyString(r.name) || !playUrl || !thumbnail) {
-      console.warn(`[seo] skipping invalid games.json entry: ${JSON.stringify(r.id ?? r.name ?? raw)}`);
+      // Never print the raw entry: it can hold a credentialed thumbnail URL.
+      console.warn(`[seo] skipping invalid games.json entry: ${JSON.stringify(isNonEmptyString(r.id) ? r.id : isNonEmptyString(r.name) ? r.name : '(unnamed entry)')}`);
       continue;
     }
     // The id becomes a directory and URL; fail loudly rather than publish a broken link.
