@@ -134,6 +134,19 @@ test('requireUser returns 503 when the sign-in check cannot reach Supabase', asy
   });
 });
 
+test('requireUser returns 503 when the sign-in check times out, and the check carries a timeout signal', async () => {
+  const calls = [];
+  const fetchImpl = async (input, init) => {
+    calls.push({ input, init });
+    throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+  };
+  assert.deepEqual(await requireUser(request(`Bearer ${token}`), deps(fetchImpl)), {
+    status: 503,
+    error: 'Could not check sign-in, try again',
+  });
+  assert.ok(calls[0].init.signal instanceof AbortSignal);
+});
+
 test('requireVerified returns 401 Sign in first for a signed-out request', async () => {
   const { fetchImpl, calls } = fakeFetch(200, supabaseUser);
   assert.deepEqual(await requireVerified(request(), deps(fetchImpl)), { status: 401, error: 'Sign in first' });

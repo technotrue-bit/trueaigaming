@@ -50,6 +50,7 @@ export async function readUser(req, { fetchImpl = fetch, url, anonKey }) {
   const res = await fetchImpl(`${url}/auth/v1/user`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${match[1]}`, apikey: anonKey },
+    signal: AbortSignal.timeout(10_000),
   });
   if (res.status === 401) return null;
   if (!res.ok) throw new Error(`Auth check failed with status ${res.status}`);
