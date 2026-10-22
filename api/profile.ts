@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { requireUser } from '../server/auth.mjs';
-import { triggerRebuild } from '../server/deploy.mjs';
+import { rebuildForClient, triggerRebuild } from '../server/deploy.mjs';
 import { InvalidJson, PayloadTooLarge, readJson, send } from '../server/http.mjs';
 import { deleteAccount, ensureProfile, setHandle } from '../server/profiles.mjs';
 import { createStore } from '../server/store.mjs';
@@ -53,7 +53,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const result = await deleteAccount({
       store,
       user: auth.user,
-      rebuild: () => triggerRebuild({ hookUrl: process.env.DEPLOY_HOOK_URL }),
+      // The hook URL is read here only. rebuildForClient keeps the config name and hook details out of the reply.
+      rebuild: () => rebuildForClient({ trigger: () => triggerRebuild({ hookUrl: process.env.DEPLOY_HOOK_URL }) }),
     });
     return send(res, 200, { ok: true, rebuild: result.rebuild });
   } catch (err) {

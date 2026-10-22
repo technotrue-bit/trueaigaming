@@ -218,3 +218,16 @@ test('deleteAccount rebuilds when a delete commits and then throws, so the remov
   assert.equal(calls.length, 1);
   assert.equal(store.state.submissions.has('s1'), false);
 });
+
+test('deleteAccount passes the rebuild result through unchanged, so the route can send the fixed text', async () => {
+  const store = createTestStore({
+    profiles: [{ id: 'user-1', handle: 'ada', display_name: 'Ada' }],
+    submissions: [{ id: 's1', owner_id: 'user-1', slug: 'one-game', status: 'approved' }],
+  });
+  const { calls, rebuild } = rebuildSpy({ ok: false, error: 'Rebuild did not start' });
+
+  const result = await deleteAccount({ store, user: user('user-1'), rebuild });
+
+  assert.deepEqual(result, { ok: true, rebuild: { ok: false, error: 'Rebuild did not start' } });
+  assert.equal(calls.length, 1);
+});

@@ -1,7 +1,7 @@
 // Rebuild trigger: a missing hook, a 2xx reply, an error reply, a network failure and a timeout. Fake fetch only. Run with `npm test`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { triggerRebuild } from './deploy.mjs';
+import { rebuildForClient, triggerRebuild } from './deploy.mjs';
 
 // A made-up hook. The last segment stands in for the secret token, which must never appear in an error.
 const hookUrl = 'https://api.vercel.com/v1/integrations/deploy/prj_test/secret-token-value';
@@ -77,4 +77,46 @@ test('returns a timeout error when the abort signal fires', async () => {
     throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
   };
   assert.deepEqual(await triggerRebuild({ hookUrl, fetchImpl }), { ok: false, error: 'Rebuild hook timed out' });
+});
+
+// The client gets one fixed message for every failed rebuild. The real reason is logged, never returned.
+const FIXED = { ok: false, error: 'Rebuild did not start' };
+
+/** A log that records each call as [message, detail]. */
+function recordingLog() {
+  const logged = [];
+  return { logged, log: (message, detail) => logged.push([message, detail]) };
+}
+
+test('rebuildForClient returns the fixed text when the trigger throws, and logs the error', async () => {
+  const { logged, log } = recordingLog();
+  const boom = new Error('DEPLOY_HOOK_URL is not set');
+  const result = await rebuildForClient({ trigger: async () => { throw boom; }, log });
+  assert.deepEqual(result, FIXED);
+  assert.equal(JSON.stringify(result).includes('DEPLOY_HOOK_URL'), false);
+  assert.equal(logged.length, 1);
+  assert.equal(logged[0][1], boom);
+});
+
+test('rebuildForClient returns the fixed text when the trigger resolves to null, and logs it', async () => {
+  const { logged, log } = recordingLog();
+  const result = await rebuildForClient({ trigger: async () => null, log });
+  assert.deepEqual(result, FIXED);
+  assert.equal(JSON.stringify(result).includes('DEPLOY_HOOK_URL'), false);
+  assert.equal(logged.length, 1);
+});
+
+test('rebuildForClient returns the fixed text for a config error, and logs the real reason', async () => {
+  const { logged, log } = recordingLog();
+  const result = await rebuildForClient({ trigger: async () => ({ ok: false, error: 'DEPLOY_HOOK_URL is not set' }), log });
+  assert.deepEqual(result, FIXED);
+  assert.equal(JSON.stringify(result).includes('DEPLOY_HOOK_URL'), false);
+  assert.equal(logged.length, 1);
+  assert.equal(logged[0][1], 'DEPLOY_HOOK_URL is not set');
+});
+
+test('rebuildForClient returns ok and logs nothing when the rebuild starts', async () => {
+  const { logged, log } = recordingLog();
+  assert.deepEqual(await rebuildForClient({ trigger: async () => ({ ok: true }), log }), { ok: true });
+  assert.equal(logged.length, 0);
 });

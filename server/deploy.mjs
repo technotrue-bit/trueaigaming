@@ -25,3 +25,41 @@ export async function triggerRebuild({ hookUrl, fetchImpl = fetch }) {
     return { ok: false, error: timedOut ? 'Rebuild hook timed out' : 'Rebuild hook request failed' };
   }
 }
+
+/** The only rebuild text a client sees. The reason goes to the log. */
+const REBUILD_NOT_STARTED = 'Rebuild did not start';
+
+/**
+ * @param {string} message
+ * @param {unknown} detail
+ */
+function defaultLog(message, detail) {
+  console.error(`deploy: ${message}`, detail);
+}
+
+/**
+ * Runs a rebuild for a client response. A thrown error, a missing result and a result that is not ok all give the
+ * same fixed text, so no config name or hook detail reaches the client. The reason goes to `log` as (message, detail).
+ * @param {{ trigger: () => Promise<RebuildResult>, log?: (message: string, detail: unknown) => void }} options
+ * @returns {Promise<RebuildResult>}
+ */
+export async function rebuildForClient({ trigger, log = defaultLog }) {
+  /** @type {unknown} */
+  let result;
+  try {
+    result = await trigger();
+  } catch (err) {
+    log('rebuild threw', err);
+    return { ok: false, error: REBUILD_NOT_STARTED };
+  }
+  if (typeof result !== 'object' || result === null) {
+    log('rebuild returned no result', result);
+    return { ok: false, error: REBUILD_NOT_STARTED };
+  }
+  const reply = /** @type {{ ok?: unknown, error?: unknown }} */ (result);
+  if (reply.ok !== true) {
+    log('rebuild did not start', reply.error);
+    return { ok: false, error: REBUILD_NOT_STARTED };
+  }
+  return { ok: true };
+}

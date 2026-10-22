@@ -3,6 +3,7 @@
 // The store and the rebuild function are arguments, so tests pass in-memory fakes. Results are { ok: true, value }
 // or { ok: false, status, error }. Nothing here reads the environment.
 import { isBlobThumbnailUrl, validateSubmission } from '../src/shared/submission-rules.mjs';
+import { rebuildForClient } from './deploy.mjs';
 
 /**
  * @typedef {import('./store.mjs').Submission} Submission
@@ -117,27 +118,17 @@ async function ownedRow(store, ownerId, id) {
   return row && row.owner_id === ownerId ? row : null;
 }
 
-/** The only rebuild text a client sees. The reason goes to the server log. */
-const REBUILD_NOT_STARTED = 'Rebuild did not start';
-
 /**
- * Runs the rebuild. A rebuild that throws or does not start becomes a failed result with fixed text, so the
- * caller still reports the saved change and no config name or hook detail reaches the client. The reason is logged.
+ * Runs the rebuild for a client response. A failure becomes fixed text, and the reason is logged with a
+ * "submissions:" prefix. The shared rule lives in rebuildForClient.
  * @param {Rebuild} rebuild
  * @returns {Promise<RebuildResult>}
  */
 async function runRebuild(rebuild) {
-  let result;
-  try {
-    result = await rebuild();
-  } catch (err) {
-    console.error('submissions: rebuild threw', err);
-    return { ok: false, error: REBUILD_NOT_STARTED };
-  }
-  if (result.ok) return { ok: true };
-  // The trigger's messages never include the hook URL, so they are safe to log.
-  console.error('submissions: rebuild did not start', result.error);
-  return { ok: false, error: REBUILD_NOT_STARTED };
+  return rebuildForClient({
+    trigger: rebuild,
+    log: (message, detail) => console.error(`submissions: ${message}`, detail),
+  });
 }
 
 /**
