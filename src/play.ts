@@ -192,6 +192,9 @@ try {
   const game = (await loadGames()).find((g) => g.id === id);
   if (!game) {
     showMessage('Game not found', "We couldn't find that game. It may have moved.");
+  } else if (game.external) {
+    // Submitted games run on their own site. Send the visitor there instead of framing it.
+    location.replace(game.playUrl);
   } else {
     document.title = `${game.name}: TrueAIGaming`;
     title.textContent = game.name;
