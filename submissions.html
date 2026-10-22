@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b0221" />
+    <title>My games: TrueAIGaming</title>
+    <meta name="description" content="See the games you have submitted to TrueAIGaming." />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <style>
+      [hidden] {
+        display: none !important;
+      }
+      .my-games {
+        max-width: 36rem;
+        padding-block: 1.5rem 3rem;
+      }
+      .my-games-title {
+        margin: 0.5rem 0 1rem;
+        font-family: var(--font-display);
+        font-size: 2rem;
+        line-height: 1.2;
+      }
+      .my-games-back {
+        margin: 0;
+      }
+      .my-games-notice {
+        margin: 0 0 1rem;
+        font-weight: 700;
+      }
+      .my-games-created {
+        margin: 0 0 1rem;
+        padding: 0.75rem 1rem;
+        border: 2px solid rgb(41 243 255 / 0.4);
+        border-radius: var(--radius);
+        background: var(--panel);
+        font-weight: 700;
+      }
+      .my-games-action-status {
+        min-height: 1.5em;
+        margin: 0 0 0.5rem;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      .my-games-action-status.is-error {
+        color: #ff8a8a;
+      }
+      .my-games-empty {
+        margin: 0;
+        color: var(--muted);
+      }
+      .my-games-empty a {
+        color: var(--yellow);
+      }
+      .my-games-list {
+        display: grid;
+        gap: 1rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .my-game {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem 1rem;
+        padding: 1rem 1.25rem;
+        border: 2px solid rgb(41 243 255 / 0.4);
+        border-radius: var(--radius);
+        background: var(--panel);
+      }
+      .my-game-info {
+        display: grid;
+        gap: 0.25rem;
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      .my-game-name {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 1.15rem;
+        line-height: 1.25;
+      }
+      .my-game-status {
+        margin: 0;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      .my-game-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+      }
+      .my-games .btn {
+        cursor: pointer;
+        font-family: inherit;
+      }
+      .my-games .btn-ghost {
+        background: transparent;
+      }
+      .my-games .btn-danger {
+        color: #ff8a8a;
+        border: 2px solid #ff8a8a;
+        background: transparent;
+      }
+      .my-games .btn:disabled {
+        opacity: 0.6;
+        cursor: progress;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="my-games" class="wrap my-games">
+      <div id="page-head" hidden>
+        <p class="my-games-back"><a href="/account">Back to account</a></p>
+        <h1 class="my-games-title">My games</h1>
+      </div>
+      <p id="created-note" class="my-games-created" role="status" hidden>Submitted. It will appear on the site once it's approved.</p>
+      <p id="notice" class="my-games-notice" role="status" aria-live="polite" hidden></p>
+      <button id="retry" class="btn btn-ghost" type="button" hidden>Try again</button>
+      <p id="action-status" class="my-games-action-status" role="status" aria-live="polite"></p>
+      <p id="empty" class="my-games-empty" hidden>You have no games yet. <a href="/submit">Submit a game</a>.</p>
+      <ul id="games" class="my-games-list"></ul>
+    </main>
+    <script type="module" src="/src/account/submissions.ts"></script>
+  </body>
+</html>
