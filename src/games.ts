@@ -1,4 +1,5 @@
 import './style.css';
+import { isBlobThumbnailUrl } from './shared/submission-rules.mjs';
 
 export interface Game {
   id: string;
@@ -8,6 +9,8 @@ export interface Game {
   thumbnail: string;
   status: string;
   repo?: string;
+  /** Submitted game hosted elsewhere: Play goes to playUrl in a new tab, never /play.html. */
+  external?: boolean;
   /** Shown behind the card's info button. Cards without it get no button. */
   howItWasMade?: string;
   minPlayers?: number;
@@ -40,9 +43,18 @@ function safeHttpsUrl(value: unknown): string | null {
   }
 }
 
-/** Thumbnails must be same-origin paths (the CSP only allows img-src 'self'). */
+/** Same-origin paths only. */
 function safeLocalPath(value: unknown): string | null {
   return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : null;
+}
+
+/** Same-origin path, or an https Vercel Blob URL without credentials, for submitted games (the CSP img-src must allow that host). */
+function safeThumbnail(value: unknown): string | null {
+  if (typeof value === 'string' && isBlobThumbnailUrl(value)) {
+    const url = new URL(value);
+    if (!url.username && !url.password) return url.href;
+  }
+  return safeLocalPath(value);
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -53,7 +65,7 @@ function parseGame(raw: unknown): Game | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
   const playUrl = safeHttpsUrl(r.playUrl);
-  const thumbnail = safeLocalPath(r.thumbnail);
+  const thumbnail = safeThumbnail(r.thumbnail);
   if (!isNonEmptyString(r.id) || !isNonEmptyString(r.name) || !playUrl || !thumbnail) return null;
   return {
     id: r.id,
@@ -63,6 +75,7 @@ function parseGame(raw: unknown): Game | null {
     thumbnail,
     status: isNonEmptyString(r.status) ? r.status.toLowerCase() : 'live',
     repo: safeHttpsUrl(r.repo) ?? undefined,
+    external: r.external === true ? true : undefined,
     howItWasMade: isNonEmptyString(r.howItWasMade) ? r.howItWasMade.trim() : undefined,
     minPlayers: positiveInt(r.minPlayers),
     maxPlayers: positiveInt(r.maxPlayers),

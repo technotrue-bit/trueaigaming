@@ -3,6 +3,7 @@
 // JSON-LD and sitemap.xml. Used by vite.config.ts; nothing here ships to the browser.
 import { readFileSync, writeFileSync, mkdirSync, rmSync, openSync, readSync, closeSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { isBlobThumbnailUrl } from '../src/shared/submission-rules.mjs';
 
 export const ORIGIN = 'https://trueaigaming.com';
 export const SITE_NAME = 'TrueAIGaming';
@@ -33,7 +34,12 @@ export const PAGES_DIR = join(ROOT, 'games');
  * @property {string} [about]
  * @property {number} [minPlayers]
  * @property {number} [maxPlayers]
+ * @property {number} [minWidth] Play-page minimum size (CSS px), 200 to 4000, same as src/games.ts. Used when the game is framed.
+ * @property {number} [minHeight]
+ * @property {number} [minWidthLandscape]
+ * @property {number} [minHeightLandscape]
  * @property {string} author
+ * @property {boolean} [external] Submitted game hosted elsewhere: Play goes to playUrl in a new tab, never /play.html.
  */
 
 // ---------- Escaping ----------
@@ -75,16 +81,28 @@ function safeLocalPath(value) {
   return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : null;
 }
 
+/** Same-origin path, or an https Vercel Blob URL without credentials, for submitted games. Same rules as src/games.ts. @param {unknown} value */
+function safeThumbnail(value) {
+  if (typeof value === 'string' && isBlobThumbnailUrl(value)) {
+    const url = new URL(value);
+    if (!url.username && !url.password) return url.href;
+  }
+  return safeLocalPath(value);
+}
+
 /** @param {unknown} value @returns {value is string} */
 const isNonEmptyString = (value) => typeof value === 'string' && value.trim() !== '';
 
 /** @param {unknown} value */
 const positiveInt = (value) => (Number.isInteger(value) && /** @type {number} */ (value) > 0 ? /** @type {number} */ (value) : undefined);
 
-/** Real pixel size of a PNG thumbnail (IHDR); other formats fall back to the documented 1280x720. @param {string} path */
+/** Min-size hints must be sane CSS pixel sizes; anything else is ignored so the play page defaults apply. Same rule as src/games.ts. @param {unknown} value */
+const minSize = (value) => (typeof value === 'number' && Number.isFinite(value) && value >= 200 && value <= 4000 ? Math.round(value) : undefined);
+
+/** Real pixel size of a local PNG thumbnail (IHDR); other formats and remote thumbnails fall back to the documented 1280x720. @param {string} path */
 function imageSize(path) {
   const fallback = { width: 1280, height: 720 };
-  if (!path.toLowerCase().endsWith('.png')) return fallback;
+  if (!path.startsWith('/') || !path.toLowerCase().endsWith('.png')) return fallback;
   try {
     const fd = openSync(join(ROOT, 'public', path), 'r');
     const buf = Buffer.alloc(24);
@@ -98,10 +116,10 @@ function imageSize(path) {
   }
 }
 
-/** @returns {Game[]} */
-export function loadGames() {
+/** @param {string} [file] games.json to read. Defaults to public/games.json. @returns {Game[]} */
+export function loadGames(file = join(ROOT, 'public/games.json')) {
   /** @type {unknown} */
-  const data = JSON.parse(readFileSync(join(ROOT, 'public/games.json'), 'utf8'));
+  const data = JSON.parse(readFileSync(file, 'utf8'));
   if (!Array.isArray(data)) throw new Error('public/games.json must be an array');
   /** @type {Game[]} */
   const games = [];
@@ -109,10 +127,11 @@ export function loadGames() {
     if (typeof raw !== 'object' || raw === null) continue;
     const r = /** @type {Record<string, unknown>} */ (raw);
     const playUrl = safeHttpsUrl(r.playUrl);
-    const thumbnail = safeLocalPath(r.thumbnail);
+    const thumbnail = safeThumbnail(r.thumbnail);
     // Skipped exactly like src/games.ts skips them, so the prerendered grid matches the JS one.
     if (!isNonEmptyString(r.id) || !isNonEmptyString(r.name) || !playUrl || !thumbnail) {
-      console.warn(`[seo] skipping invalid games.json entry: ${JSON.stringify(r.id ?? r.name ?? raw)}`);
+      // Never print the raw entry: it can hold a credentialed thumbnail URL.
+      console.warn(`[seo] skipping invalid games.json entry: ${JSON.stringify(isNonEmptyString(r.id) ? r.id : isNonEmptyString(r.name) ? r.name : '(unnamed entry)')}`);
       continue;
     }
     // The id becomes a directory and URL; fail loudly rather than publish a broken link.
@@ -136,6 +155,11 @@ export function loadGames() {
       minPlayers,
       maxPlayers: maxPlayers && minPlayers && maxPlayers < minPlayers ? minPlayers : maxPlayers,
       author: isNonEmptyString(r.author) ? r.author.trim() : DEFAULT_AUTHOR,
+      external: r.external === true ? true : undefined,
+      minWidth: minSize(r.minWidth),
+      minHeight: minSize(r.minHeight),
+      minWidthLandscape: minSize(r.minWidthLandscape),
+      minHeightLandscape: minSize(r.minHeightLandscape),
     });
   }
   return games;
@@ -229,12 +253,20 @@ const ORGANIZATION = {
 
 // ---------- Home page ----------
 
+/** Where Play goes: /play.html for hosted games, the game's own site in a new tab for external ones. @param {Game} g */
+const playAttrs = (g) => (g.external ? `href="${esc(g.playUrl)}" target="_blank" rel="noopener noreferrer"` : `href="${esc(playPath(g))}"`);
+
+/** Cover link label. An external cover says it opens a new tab. Same text as home.ts card(). @param {Game} g */
+const coverLabel = (g) => `Play ${esc(g.name)}${g.external ? ' (opens in a new tab)' : ''}`;
+
 /** Same markup and classes as card() in src/home.ts. @param {Game} g @param {number} index */
 export function cardHtml(g, index) {
-  const actions = [
-    `<a class="btn btn-primary" href="${esc(playPath(g))}">Play here</a>`,
-    `<a class="btn btn-link" href="${esc(g.playUrl)}" target="_blank" rel="noopener">Play in browser ↗</a>`,
-  ];
+  const actions = g.external
+    ? [`<a class="btn btn-primary" ${playAttrs(g)}>Play</a>`]
+    : [
+        `<a class="btn btn-primary" ${playAttrs(g)}>Play here</a>`,
+        `<a class="btn btn-link" href="${esc(g.playUrl)}" target="_blank" rel="noopener">Play in browser ↗</a>`,
+      ];
   const players = playersText(g);
   const facts = players ? `<ul class="card-facts"><li>${esc(players)}</li></ul>` : '';
   if (g.repo) actions.push(`<a class="btn btn-link" href="${esc(g.repo)}" target="_blank" rel="noopener">Source</a>`);
@@ -244,7 +276,7 @@ export function cardHtml(g, index) {
     : '';
   const how = g.howItWasMade ? `<div class="card-how" id="how-${id}" hidden><p>${esc(g.howItWasMade)}</p></div>` : '';
   return `<li class="card">
-          <a class="card-cover" href="${esc(playPath(g))}" aria-label="Play ${esc(g.name)}">
+          <a class="card-cover" ${playAttrs(g)} aria-label="${coverLabel(g)}">
             <img src="${esc(g.thumbnail)}" alt="${esc(g.name)} screenshot" width="1280" height="720" decoding="async" loading="${index < 2 ? 'eager' : 'lazy'}" /><span class="${statusClass(g.status)}">${esc(g.status)}</span>
           </a>
           <div class="card-body">
@@ -332,6 +364,10 @@ export function gamePageHtml(g) {
   const players = playersText(g);
   const longDesc = g.longDescription && g.longDescription !== g.description ? `\n          <p class="gp-long">${esc(g.longDescription)}</p>` : '';
   const source = g.repo ? `\n            <a class="btn btn-link" href="${esc(g.repo)}" target="_blank" rel="noopener">Source</a>` : '';
+  const playButtons = g.external
+    ? `<a class="btn btn-primary btn-lg" ${playAttrs(g)}>Play</a>`
+    : `<a class="btn btn-primary btn-lg" ${playAttrs(g)}>Play here</a>
+            <a class="btn btn-ghost" href="${esc(g.playUrl)}" target="_blank" rel="noopener">Play in browser ↗</a>`;
   return `<!doctype html>
 <!-- Generated by scripts/seo.mjs from public/games.json. Do not edit; changes are overwritten on every dev/build. -->
 <html lang="en">
@@ -361,7 +397,7 @@ export function gamePageHtml(g) {
     <main id="game" class="wrap gp-main">
       <a class="gp-back" href="/">← Back to all games</a>
       <article class="gp-game">
-        <a class="gp-shot card-cover" href="${esc(playPath(g))}" aria-label="Play ${esc(g.name)}">
+        <a class="gp-shot card-cover" ${playAttrs(g)} aria-label="${coverLabel(g)}">
           <img src="${esc(g.thumbnail)}" alt="${esc(g.name)} screenshot" width="${g.thumbSize.width}" height="${g.thumbSize.height}" decoding="async" fetchpriority="high" /><span class="${statusClass(g.status)}">${esc(g.status)}</span>
         </a>
         <div class="gp-info">
@@ -371,14 +407,14 @@ export function gamePageHtml(g) {
             ${[players, 'Free', 'Runs in your browser'].filter(Boolean).map((f) => `<li>${esc(f)}</li>`).join('')}
           </ul>
           <div class="gp-actions">
-            <a class="btn btn-primary btn-lg" href="${esc(playPath(g))}">Play here</a>
-            <a class="btn btn-ghost" href="${esc(g.playUrl)}" target="_blank" rel="noopener">Play in browser ↗</a>${source}
+            ${playButtons}${source}
           </div>
         </div>
       </article>${aboutHtml(g)}
     </main>
     <footer class="footer wrap">
-      <p>No accounts. Just games.</p>
+      <p>Free to play. Sign up to share your own game.</p>
+      <p><a href="/account">Sign in or share your game</a> &middot; <a href="/privacy.html">Privacy</a></p>
       <p class="tip">Tips keep the games free. <a class="btn btn-tip" href="${KOFI_URL}" target="_blank" rel="noopener">Support on Ko-fi</a></p>
       <p class="tip"><a class="btn btn-tip" href="${X_URL}" target="_blank" rel="noopener">Follow @ItsMeTrueG on X</a></p>
     </footer>

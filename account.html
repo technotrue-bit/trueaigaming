@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b0221" />
+    <title>Account: TrueAIGaming</title>
+    <meta name="description" content="Create an account to submit your own game to TrueAIGaming." />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <style>
+      [hidden] {
+        display: none !important;
+      }
+      .account {
+        max-width: 28rem;
+        padding-block: 1.5rem 3rem;
+      }
+      .account-title {
+        margin: 0.5rem 0 1rem;
+        font-family: var(--font-display);
+        font-size: 2rem;
+        line-height: 1.2;
+      }
+      .account-notice {
+        margin: 0 0 1rem;
+        font-weight: 700;
+      }
+      .account-panel {
+        display: grid;
+        gap: 1rem;
+        padding: 1.25rem;
+        border: 2px solid rgb(41 243 255 / 0.4);
+        border-radius: var(--radius);
+        background: var(--panel);
+      }
+      .account-panel h2,
+      .account-subhead {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 1.15rem;
+        line-height: 1.25;
+      }
+      .account-panel p {
+        margin: 0;
+      }
+      .account-form {
+        display: grid;
+        gap: 0.9rem;
+      }
+      .account-label {
+        display: grid;
+        gap: 0.35rem;
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+      .account input {
+        width: 100%;
+        padding: 0.55rem 0.7rem;
+        border: 1px solid rgb(185 166 221 / 0.5);
+        border-radius: 10px;
+        background: var(--bg);
+        color: var(--text);
+        font: inherit;
+        font-size: 1rem; /* 16px+ stops iOS zooming on focus */
+      }
+      .account-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+      }
+      .account .btn {
+        cursor: pointer;
+        font-family: inherit;
+      }
+      .account .btn-primary {
+        border: 0;
+      }
+      .account .btn-ghost {
+        background: transparent;
+      }
+      .account .btn-danger {
+        color: #ff8a8a;
+        border: 2px solid #ff8a8a;
+        background: transparent;
+      }
+      .account .btn:disabled {
+        opacity: 0.6;
+        cursor: progress;
+      }
+      .account button.btn-link {
+        padding: 0.5rem 0;
+        border: 0;
+        background: none;
+        font: inherit;
+      }
+      .account-status {
+        min-height: 1.5em;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      .account-status.is-error {
+        color: #ff8a8a;
+      }
+      .account-back {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="account" class="wrap account">
+      <div id="page-head" hidden>
+        <p class="account-back"><a href="/">Back to games</a></p>
+        <h1 class="account-title">Account</h1>
+      </div>
+      <p id="notice" class="account-notice" role="status" aria-live="polite" hidden></p>
+      <button id="retry" class="btn btn-ghost" type="button" hidden>Try again</button>
+
+      <section id="signed-out" class="account-panel" aria-labelledby="signup-title" hidden>
+        <h2 id="signup-title">Create account</h2>
+        <form id="signup-form" class="account-form">
+          <label class="account-label">
+            Email
+            <input name="email" type="email" required autocomplete="email" maxlength="254" />
+          </label>
+          <label class="account-label">
+            Password (at least 12 characters)
+            <input name="password" type="password" required autocomplete="new-password" />
+          </label>
+          <label class="account-label">
+            Handle (3 to 24 characters)
+            <input name="handle" type="text" required minlength="3" maxlength="24" autocomplete="off" />
+          </label>
+          <label class="account-label">
+            Display name (optional)
+            <input name="display_name" type="text" maxlength="40" autocomplete="nickname" />
+          </label>
+          <button id="signup-submit" class="btn btn-primary" type="submit">Create account</button>
+          <p id="signup-status" class="account-status" role="status"></p>
+        </form>
+
+        <h2 class="account-subhead">Sign in</h2>
+        <form id="signin-form" class="account-form">
+          <label class="account-label">
+            Email
+            <input name="email" type="email" required autocomplete="email" maxlength="254" />
+          </label>
+          <label class="account-label">
+            Password
+            <input name="password" type="password" required autocomplete="current-password" />
+          </label>
+          <button id="signin-submit" class="btn btn-primary" type="submit">Sign in</button>
+          <p id="signin-status" class="account-status" role="status"></p>
+        </form>
+        <p><button id="forgot" class="btn btn-link" type="button">Forgot password?</button></p>
+      </section>
+
+      <section id="unverified" class="account-panel" aria-labelledby="verify-title" hidden>
+        <h2 id="verify-title">Verify your email</h2>
+        <p>Verify your email to submit games.</p>
+        <div class="account-actions">
+          <button id="resend" class="btn btn-primary" type="button">Resend</button>
+          <button id="unverified-sign-out" class="btn btn-ghost" type="button">Sign out</button>
+        </div>
+        <p id="unverified-status" class="account-status" role="status"></p>
+      </section>
+
+      <section id="verified" class="account-panel" aria-labelledby="verified-title" hidden>
+        <h2 id="verified-title">Your account</h2>
+        <p>Signed in as @<span id="handle"></span></p>
+        <div class="account-actions">
+          <a class="btn btn-primary" href="/submit">Submit a game</a>
+          <a class="btn btn-ghost" href="/account/submissions">My games</a>
+          <button id="sign-out" class="btn btn-ghost" type="button">Sign out</button>
+        </div>
+        <h2 class="account-subhead">Delete account</h2>
+        <p>Deleting your account also removes all your games.</p>
+        <div class="account-actions">
+          <button id="delete" class="btn btn-danger" type="button">Delete account</button>
+        </div>
+        <p id="verified-status" class="account-status" role="status"></p>
+      </section>
+
+      <section id="handle-setup" class="account-panel" aria-labelledby="handle-title" hidden>
+        <h2 id="handle-title">Choose a handle</h2>
+        <p>Use 3 to 24 letters, numbers or hyphens. Start and end with a letter or number.</p>
+        <form id="handle-form" class="account-form">
+          <label class="account-label">
+            Handle
+            <input name="handle" type="text" required minlength="3" maxlength="24" autocomplete="off" />
+          </label>
+          <button id="handle-save" class="btn btn-primary" type="submit">Save handle</button>
+          <p id="handle-status" class="account-status" role="status"></p>
+        </form>
+        <div class="account-actions">
+          <button id="handle-sign-out" class="btn btn-ghost" type="button">Sign out</button>
+        </div>
+      </section>
+
+      <section id="new-password" class="account-panel" aria-labelledby="new-password-title" hidden>
+        <h2 id="new-password-title">Set a new password</h2>
+        <form id="new-password-form" class="account-form">
+          <label class="account-label">
+            New password (at least 12 characters)
+            <input name="password" type="password" required autocomplete="new-password" />
+          </label>
+          <button id="new-password-save" class="btn btn-primary" type="submit">Save password</button>
+          <p id="new-password-status" class="account-status" role="status"></p>
+        </form>
+      </section>
+    </main>
+    <script type="module" src="/src/account/account.ts"></script>
+  </body>
+</html>

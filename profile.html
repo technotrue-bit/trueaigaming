@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b0221" />
+    <title>Player profile: TrueAIGaming</title>
+    <meta name="description" content="A player's approved games on TrueAIGaming." />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <style>
+      [hidden] {
+        display: none !important;
+      }
+      .profile {
+        max-width: 36rem;
+        padding-block: 1.5rem 3rem;
+      }
+      .profile-back {
+        margin: 0;
+      }
+      .profile-notice {
+        margin: 0 0 1rem;
+        font-weight: 700;
+      }
+      .profile-name {
+        margin: 0.5rem 0 0.25rem;
+        font-family: var(--font-display);
+        font-size: 2rem;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+      }
+      .profile-handle {
+        margin: 0 0 1.25rem;
+        color: var(--muted);
+      }
+      .profile-subhead {
+        margin: 0 0 0.75rem;
+        font-family: var(--font-display);
+        font-size: 1.15rem;
+        line-height: 1.25;
+      }
+      .profile-empty {
+        margin: 0;
+        color: var(--muted);
+      }
+      .profile-games {
+        display: grid;
+        gap: 1rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .profile-game {
+        display: grid;
+        gap: 0.25rem;
+        padding: 1rem 1.25rem;
+        border: 2px solid rgb(41 243 255 / 0.4);
+        border-radius: var(--radius);
+        background: var(--panel);
+        overflow-wrap: anywhere;
+      }
+      .profile-game-link {
+        font-family: var(--font-display);
+        font-size: 1.15rem;
+        line-height: 1.25;
+        color: var(--text);
+        text-decoration: none;
+      }
+      .profile-game-link:hover,
+      .profile-game-link:focus-visible {
+        color: var(--cyan);
+        text-decoration: underline;
+      }
+      .profile-game-desc {
+        margin: 0;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      .profile .btn {
+        cursor: pointer;
+        font-family: inherit;
+      }
+      .profile .btn-ghost {
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="profile" class="wrap profile">
+      <div id="page-head" hidden>
+        <p class="profile-back"><a href="/">Back to games</a></p>
+      </div>
+      <p id="notice" class="profile-notice" role="status" aria-live="polite" hidden></p>
+      <button id="retry" class="btn btn-ghost" type="button" hidden>Try again</button>
+      <section id="player" hidden>
+        <h1 id="player-name" class="profile-name"></h1>
+        <p id="player-handle" class="profile-handle" hidden></p>
+        <h2 class="profile-subhead">Games</h2>
+        <p id="empty" class="profile-empty" hidden>No approved games yet.</p>
+        <ul id="games" class="profile-games"></ul>
+      </section>
+    </main>
+    <script type="module" src="/src/profile/profile.ts"></script>
+  </body>
+</html>

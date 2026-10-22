@@ -3,6 +3,28 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/u/:handle",
+      "destination": "/profile.html"
+    },
+    {
+      "source": "/account/submissions",
+      "destination": "/submissions.html"
+    },
+    {
+      "source": "/submit",
+      "destination": "/submit.html"
+    },
+    {
+      "source": "/admin/review",
+      "destination": "/admin.html"
+    },
+    {
+      "source": "/account",
+      "destination": "/account.html"
+    }
+  ],
   "redirects": [
     {
       "source": "/",
@@ -48,7 +70,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-src https://super-star-party.vercel.app https://*.vercel.app; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; object-src 'none'"
+          "value": "default-src 'self'; connect-src 'self' https://ycajnupfbiushygycclf.supabase.co; img-src 'self' data: https://*.public.blob.vercel-storage.com; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-src https://super-star-party.vercel.app https://*.vercel.app; frame-ancestors 'none'; base-uri 'self'; form-action 'none'; object-src 'none'"
         },
         {
           "key": "X-Content-Type-Options",

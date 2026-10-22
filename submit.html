@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b0221" />
+    <title>Submit a game: TrueAIGaming</title>
+    <meta name="description" content="Submit your own game to TrueAIGaming." />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <style>
+      [hidden] {
+        display: none !important;
+      }
+      .submit {
+        max-width: 36rem;
+        padding-block: 1.5rem 3rem;
+      }
+      .submit-title {
+        margin: 0.5rem 0 1rem;
+        font-family: var(--font-display);
+        font-size: 2rem;
+        line-height: 1.2;
+      }
+      .submit-notice {
+        margin: 0 0 1rem;
+        font-weight: 700;
+      }
+      .submit-panel,
+      .submit-form {
+        display: grid;
+        gap: 1rem;
+        padding: 1.25rem;
+        border: 2px solid rgb(41 243 255 / 0.4);
+        border-radius: var(--radius);
+        background: var(--panel);
+      }
+      .submit-panel h2 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 1.15rem;
+        line-height: 1.25;
+      }
+      .submit-panel p,
+      .submit-edit-note {
+        margin: 0;
+      }
+      .submit-edit-note {
+        font-weight: 700;
+        color: var(--yellow);
+      }
+      .submit-field {
+        display: grid;
+        gap: 0.35rem;
+      }
+      .submit-label {
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+      .submit input,
+      .submit textarea {
+        width: 100%;
+        padding: 0.55rem 0.7rem;
+        border: 1px solid rgb(185 166 221 / 0.5);
+        border-radius: 10px;
+        background: var(--bg);
+        color: var(--text);
+        font: inherit;
+        font-size: 1rem; /* 16px+ stops iOS zooming on focus */
+      }
+      .submit textarea {
+        resize: vertical;
+      }
+      .submit input[type='file'] {
+        padding: 0.4rem 0;
+        border: 0;
+        background: none;
+        font-size: 0.9rem;
+      }
+      .submit-hint,
+      .submit-count {
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+      .submit-count.is-error {
+        color: #ff8a8a;
+      }
+      .submit-players {
+        margin: 0;
+        padding: 0;
+        border: 0;
+      }
+      .submit-players legend {
+        margin-bottom: 0.35rem;
+        padding: 0;
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+      .submit-players-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.9rem;
+      }
+      .submit-status {
+        min-height: 1.5em;
+        margin: 0;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      .submit-status.is-error {
+        color: #ff8a8a;
+      }
+      .submit .btn {
+        cursor: pointer;
+        font-family: inherit;
+      }
+      .submit .btn-primary {
+        border: 0;
+      }
+      .submit .btn-ghost {
+        background: transparent;
+      }
+      .submit .btn:disabled {
+        opacity: 0.6;
+        cursor: progress;
+      }
+      .submit-back {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="submit" class="wrap submit">
+      <div id="page-head" hidden>
+        <p class="submit-back"><a href="/account">Back to account</a></p>
+        <h1 id="page-title" class="submit-title">Submit a game</h1>
+      </div>
+      <p id="notice" class="submit-notice" role="status" aria-live="polite" hidden></p>
+      <button id="retry" class="btn btn-ghost" type="button" hidden>Try again</button>
+
+      <section id="signed-out" class="submit-panel" aria-labelledby="signed-out-title" hidden>
+        <h2 id="signed-out-title">Sign in to submit a game</h2>
+        <p>You need an account to submit games.</p>
+        <div><a class="btn btn-primary" href="/account">Go to your account</a></div>
+      </section>
+
+      <section id="unverified" class="submit-panel" aria-labelledby="unverified-title" hidden>
+        <h2 id="unverified-title">Verify your email</h2>
+        <p>Verify your email to submit games.</p>
+        <div><a class="btn btn-primary" href="/account">Go to your account</a></div>
+      </section>
+
+      <form id="submit-form" class="submit-form" novalidate hidden>
+        <p id="edit-note" class="submit-edit-note" hidden>Editing a live game takes it off the site until it's approved again.</p>
+
+        <div class="submit-field">
+          <label class="submit-label" for="name">Name</label>
+          <input id="name" type="text" required autocomplete="off" aria-describedby="name-hint" />
+          <span id="name-hint" class="submit-hint">Up to 60 characters.</span>
+        </div>
+
+        <div class="submit-field">
+          <label class="submit-label" for="slug">Game address</label>
+          <input id="slug" type="text" required autocomplete="off" spellcheck="false" aria-describedby="slug-hint" />
+          <span id="slug-hint" class="submit-hint">Used in the game's link. Lowercase letters, numbers and hyphens.</span>
+        </div>
+
+        <div class="submit-field">
+          <label class="submit-label" for="description">Description</label>
+          <textarea id="description" rows="2" required aria-describedby="description-count"></textarea>
+          <span id="description-count" class="submit-count">0 / 140</span>
+        </div>
+
+        <div class="submit-field">
+          <label class="submit-label" for="how-it-was-made">How it was made</label>
+          <textarea id="how-it-was-made" rows="5" required aria-describedby="how-count"></textarea>
+          <span id="how-count" class="submit-count">0 / 600</span>
+        </div>
+
+        <div class="submit-field">
+          <label class="submit-label" for="play-url">Play link (https)</label>
+          <input id="play-url" type="url" required autocomplete="off" inputmode="url" />
+        </div>
+
+        <div class="submit-field">
+          <label class="submit-label" for="source-url">Source link (optional)</label>
+          <input id="source-url" type="url" autocomplete="off" inputmode="url" />
+        </div>
+
+        <div class="submit-field">
+          <label class="submit-label" for="thumbnail">Thumbnail (optional)</label>
+          <input id="thumbnail" type="file" accept="image/png,image/jpeg,image/webp" />
+          <span class="submit-hint">PNG, JPEG or WebP, 1 MB or less.</span>
+        </div>
+
+        <fieldset class="submit-players">
+          <legend>Players (1 to 16)</legend>
+          <div class="submit-players-grid">
+            <div class="submit-field">
+              <label class="submit-label" for="min-players">Minimum</label>
+              <input id="min-players" type="number" min="1" max="16" step="1" inputmode="numeric" required />
+            </div>
+            <div class="submit-field">
+              <label class="submit-label" for="max-players">Maximum</label>
+              <input id="max-players" type="number" min="1" max="16" step="1" inputmode="numeric" required />
+            </div>
+          </div>
+        </fieldset>
+
+        <p id="submit-status" class="submit-status" role="status" aria-live="polite"></p>
+        <div>
+          <button id="submit-btn" class="btn btn-primary" type="submit">Submit game</button>
+        </div>
+      </form>
+    </main>
+    <script type="module" src="/src/account/submit.ts"></script>
+  </body>
+</html>

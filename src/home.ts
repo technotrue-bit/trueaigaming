@@ -17,19 +17,21 @@ function card(game: Game, index: number): HTMLLIElement {
     loading: index < 2 ? 'eager' : 'lazy',
   });
 
+  // Hosted games play at /play.html. External games open their own site in a new tab (same as scripts/seo.mjs).
+  const playLink = game.external
+    ? { href: game.playUrl, target: '_blank', rel: 'noopener noreferrer' }
+    : { href: `/play.html?id=${encodeURIComponent(game.id)}` };
   const cover = el(
     'a',
-    { class: 'card-cover', href: `/play.html?id=${encodeURIComponent(game.id)}`, 'aria-label': `Play ${game.name} here` },
+    { class: 'card-cover', ...playLink, 'aria-label': game.external ? `Play ${game.name} (opens in a new tab)` : `Play ${game.name} here` },
     img,
     el('span', { class: statusClass(game.status) }, game.status),
   );
 
-  const actions = el(
-    'div',
-    { class: 'card-actions' },
-    el('a', { class: 'btn btn-primary', href: `/play.html?id=${encodeURIComponent(game.id)}` }, 'Play here'),
-    el('a', { class: 'btn btn-link', href: game.playUrl, target: '_blank', rel: 'noopener' }, 'Play in browser ↗'),
-  );
+  const actions = el('div', { class: 'card-actions' }, el('a', { class: 'btn btn-primary', ...playLink }, game.external ? 'Play' : 'Play here'));
+  if (!game.external) {
+    actions.append(el('a', { class: 'btn btn-link', href: game.playUrl, target: '_blank', rel: 'noopener' }, 'Play in browser ↗'));
+  }
   if (game.repo) {
     actions.append(el('a', { class: 'btn btn-link', href: game.repo, target: '_blank', rel: 'noopener' }, 'Source'));
   }

@@ -2,7 +2,7 @@
 
 A free, public arcade of games built with AI. Every game listed here was made with AI tools and is free to play in the browser.
 
-It's a static site: Vite + vanilla TypeScript, no accounts, no third-party fonts or CDNs; cookieless Vercel Web Analytics counts page views. One file, [`public/games.json`](public/games.json), drives the whole thing.
+It's a static site: Vite + vanilla TypeScript, no third-party fonts or CDNs; cookieless Vercel Web Analytics counts page views. First-party games come from one file, [`public/games.json`](public/games.json). Signed-in players can also submit their own games, which appear after review (see [Accounts and submissions](#accounts-and-submissions)). What the site stores is described on the [privacy page](privacy.html).
 
 - **Home (`/`)**: a grid of game cards. Each card links straight to the game's live URL (new tab).
 - **Play page (`/play.html?id=<game-id>`)**: gives the game the whole screen in an iframe, with a small control pill (back, full screen, open in new tab, feedback) for when embedding doesn't work well. See [Play page sizing](#play-page-sizing).
@@ -98,9 +98,33 @@ The site is hosted on Vercel and auto-deploys from git:
 
 [`vercel.json`](vercel.json) sets the framework (Vite) and applies security headers to every route:
 
-- a strict Content-Security-Policy: scripts, styles, and images come from the site itself only, iframes only from allowed game origins, and the site itself can't be framed
+- a strict Content-Security-Policy: scripts and styles come from the site itself only, images from the site itself plus Vercel Blob (`*.public.blob.vercel-storage.com`, for submitted thumbnails), network requests from the site itself plus the Supabase project, iframes only from allowed game origins (submitted games are never framed), and the site itself can't be framed
 - `X-Content-Type-Options`
 - `Referrer-Policy`
 - `X-Frame-Options: DENY`
 - a minimal `Permissions-Policy`
 - HSTS
+
+## Accounts and submissions
+
+Players can sign in (Supabase) and submit games. Approved submissions are added to the site at build time, so the site stays static. Set these in the Vercel project (or a local `.env`); never commit values.
+
+| Variable                      | Used by         | Notes                                                                          |
+| ----------------------------- | --------------- | ------------------------------------------------------------------------------ |
+| `SUPABASE_URL`                | server, build   | Supabase project URL.                                                          |
+| `SUPABASE_ANON_KEY`           | server          | Supabase anon key, used by the API to check a signed-in user.                  |
+| `SUPABASE_SERVICE_ROLE_KEY`   | server, build   | Secret. Full database access, so it must never reach the browser.              |
+| `DEPLOY_HOOK_URL`             | server          | Secret. Vercel deploy hook the API calls to rebuild the site after an approval. |
+| `VITE_SUPABASE_URL`           | browser         | Same project URL, for the sign-in client.                                      |
+| `VITE_SUPABASE_ANON_KEY`      | browser         | Public anon key, for the sign-in client.                                       |
+| `BLOB_PUBLIC_HOST`            | server, build   | The Blob store's public host, such as `abc123.public.blob.vercel-storage.com`. **Set it before launch** (see below). |
+| `SUBMISSIONS_ENABLED`         | server, build   | `true` turns the server side on (see below).                                   |
+| `VITE_SUBMISSIONS_ENABLED`    | browser         | `true` turns the pages on (see below).                                         |
+
+Only the `VITE_` variables reach the browser (Vite inlines them at build time). Everything else stays on the server and in the build.
+
+**`SUBMISSIONS_ENABLED`** is the launch switch. When it is not `true`, the account, submit, profile and admin pages show "Submissions are not open yet", the submission APIs answer 503, and the build lists no submitted games. Turn on `SUBMISSIONS_ENABLED` and `VITE_SUBMISSIONS_ENABLED` together, then redeploy. The build needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` when it is on, and fails if they are missing.
+
+**`BLOB_PUBLIC_HOST`** must be set before launch. When it is set, a submitted thumbnail must be on exactly that host, the build fails on an approved row whose thumbnail is on another host, and approving such a row is refused. When it is not set, any `*.public.blob.vercel-storage.com` store is accepted, so a thumbnail could point at someone else's store. Use the host only, with no `https://` and no trailing slash. Find it in the Vercel Blob store's settings (the part of a file's public URL before the first `/`).
+
+Submitted thumbnails are uploaded to Vercel Blob, which reads the `BLOB_READ_WRITE_TOKEN` variable (set when a Blob store is linked to the Vercel project). The feedback API uses it too.

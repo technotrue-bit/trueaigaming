@@ -1,0 +1,333 @@
+// @ts-check
+// Submission logic: create, read, edit and delete a signed-in user's own games, and the thumbnail file check.
+// The store and the rebuild function are arguments, so tests pass in-memory fakes. Results are { ok: true, value }
+// or { ok: false, status, error }. Nothing here reads the environment.
+import { validateSubmission } from '../src/shared/submission-rules.mjs';
+import { rebuildForClient } from './deploy.mjs';
+
+/**
+ * @typedef {import('./store.mjs').Submission} Submission
+ * @typedef {import('./store.mjs').Store} Store
+ * @typedef {import('../src/shared/submission-rules.mjs').SubmissionFields} SubmissionFields
+ * @typedef {{ ok: true } | { ok: false, error: string }} RebuildResult
+ * @typedef {() => Promise<RebuildResult>} Rebuild
+ */
+
+/**
+ * @template T
+ * @typedef {{ ok: true, value: T } | { ok: false, status: number, error: string }} SubmissionResult
+ */
+
+const MAX_PENDING = 5;
+const MAX_PER_DAY = 3;
+const DAY_MS = 24 * 60 * 60 * 1000;
+export const MAX_THUMBNAIL_BYTES = 1_048_576;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UNIQUE_VIOLATION = '23505';
+const RAISE_EXCEPTION = 'P0001';
+const CHECK_VIOLATION = '23514';
+const PENDING_LIMIT_TEXT = 'You can have 5 pending submissions at a time';
+const DAILY_LIMIT_TEXT = 'You can add 3 new submissions per day';
+const SLUG_TAKEN_TEXT = 'That game address is taken';
+const CHANGED_TEXT = 'This game changed, reload and try again';
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const DECLARED_TYPES = /** @type {Map<string, 'png' | 'jpg' | 'webp'>} */ (new Map([
+  ['image/png', 'png'],
+  ['image/jpeg', 'jpg'],
+  ['image/webp', 'webp'],
+]));
+
+/** @returns {{ ok: false, status: 404, error: string }} */
+function notFound() {
+  return { ok: false, status: 404, error: 'Not found' };
+}
+
+/** @param {number} status @param {string} error @returns {{ ok: false, status: number, error: string }} */
+function fail(status, error) {
+  return { ok: false, status, error };
+}
+
+/** @param {unknown} err */
+function isUniqueViolation(err) {
+  return typeof err === 'object' && err !== null && /** @type {{ code?: unknown }} */ (err).code === UNIQUE_VIOLATION;
+}
+
+/**
+ * Maps a database error from a write to a client failure, or null when it is not one of the known cases. The
+ * limit triggers raise P0001 with the message pending_limit or daily_limit, and a check constraint gives 23514.
+ * Only fixed texts come back, never the database's message or detail.
+ * @param {unknown} err
+ * @returns {{ ok: false, status: number, error: string } | null}
+ */
+function databaseFailure(err) {
+  if (typeof err !== 'object' || err === null) return null;
+  const { code, message } = /** @type {{ code?: unknown, message?: unknown }} */ (err);
+  if (code === RAISE_EXCEPTION && message === 'pending_limit') return fail(429, PENDING_LIMIT_TEXT);
+  if (code === RAISE_EXCEPTION && message === 'daily_limit') return fail(429, DAILY_LIMIT_TEXT);
+  if (code === CHECK_VIOLATION) return fail(400, 'Those game details were not accepted.');
+  return null;
+}
+
+/**
+ * The row as the owner sees it. reviewed_by is the reviewing admin's id, so it never goes to the owner.
+ * @param {Submission} row
+ * @returns {Omit<Submission, 'reviewed_by'>}
+ */
+function ownerView(row) {
+  const { reviewed_by: _reviewedBy, ...view } = row;
+  return view;
+}
+
+/**
+ * True when the game address is the id of a first-party game. The route reads the ids from public/games.json.
+ * @param {string} slug
+ * @param {Iterable<string>} firstPartyIds
+ */
+function isFirstPartyId(slug, firstPartyIds) {
+  return new Set(firstPartyIds).has(slug);
+}
+
+/** @param {number} ms */
+function iso(ms) {
+  return new Date(ms).toISOString();
+}
+
+/**
+ * Digits-only text becomes a number, because form values arrive as strings. Anything else is returned unchanged,
+ * so validatePlayers refuses it.
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function playerCount(value) {
+  if (typeof value === 'string' && /^\s*\d+\s*$/.test(value)) return Number(value);
+  return value;
+}
+
+/**
+ * Maps a form or JSON body from snake_case keys to the camelCase shape validateSubmission takes, and converts
+ * player counts to numbers. A body that is not an object is returned unchanged, so validateSubmission refuses it.
+ * @param {unknown} body
+ * @returns {unknown}
+ */
+export function submissionInput(body) {
+  if (typeof body !== 'object' || body === null) return body;
+  const fields = /** @type {Record<string, unknown>} */ (body);
+  return {
+    name: fields.name,
+    slug: fields.slug,
+    description: fields.description,
+    howItWasMade: fields.how_it_was_made,
+    playUrl: fields.play_url,
+    sourceUrl: fields.source_url,
+    thumbnailUrl: fields.thumbnail_url,
+    minPlayers: playerCount(fields.min_players),
+    maxPlayers: playerCount(fields.max_players),
+  };
+}
+
+/**
+ * The row columns for a checked submission. The values are the ones validateSubmission returned, so they are
+ * trimmed and the links are canonical.
+ * @param {SubmissionFields} fields
+ */
+function columns(fields) {
+  return {
+    name: fields.name,
+    slug: fields.slug,
+    description: fields.description,
+    how_it_was_made: fields.howItWasMade,
+    play_url: fields.playUrl,
+    source_url: fields.sourceUrl,
+    thumbnail_url: fields.thumbnailUrl,
+    min_players: fields.minPlayers,
+    max_players: fields.maxPlayers,
+  };
+}
+
+/**
+ * The caller's own row, or null. A malformed id is null without asking the store, so it cannot reach the uuid column.
+ * The owner is checked here as well as in the store query, so a store that ignores ownerId cannot expose another
+ * owner's row.
+ * @param {Store} store
+ * @param {string} ownerId
+ * @param {string} id
+ * @returns {Promise<Submission | null>}
+ */
+async function ownedRow(store, ownerId, id) {
+  if (typeof id !== 'string' || !UUID.test(id)) return null;
+  const row = await store.getOwnSubmission(ownerId, id);
+  return row && row.owner_id === ownerId ? row : null;
+}
+
+/**
+ * Runs the rebuild for a client response. A failure becomes fixed text, and the reason is logged with a
+ * "submissions:" prefix. The shared rule lives in rebuildForClient.
+ * @param {Rebuild} rebuild
+ * @returns {Promise<RebuildResult>}
+ */
+async function runRebuild(rebuild) {
+  return rebuildForClient({
+    trigger: rebuild,
+    log: (message, detail) => console.error(`submissions: ${message}`, detail),
+  });
+}
+
+/**
+ * Creates a pending submission for the owner. The owner needs a profile first (409 'Choose a handle first'). Then two
+ * caps are checked: at most 5 pending at once, and at most 3 created in the last 24 hours. The code-side daily check
+ * counts rows that still exist, so it is only an early answer; the database counts every creation, deleted rows
+ * included, and is the authority. Then the fields are checked (with blobHost, the project's Blob host, when set), and
+ * the game address must not be a first-party game id (firstPartyIds, read by the route). A game address already in
+ * use gives 409.
+ * @param {{ store: Store, ownerId: string, input: unknown, now: number, firstPartyIds?: Iterable<string>, blobHost?: string }} args `now` is epoch milliseconds.
+ * @returns {Promise<SubmissionResult<Omit<Submission, 'reviewed_by'>>>}
+ */
+export async function createSubmission({ store, ownerId, input, now, firstPartyIds = [], blobHost }) {
+  if (!(await store.getProfile(ownerId))) return fail(409, 'Choose a handle first');
+  if ((await store.countPending(ownerId)) >= MAX_PENDING) {
+    return fail(429, PENDING_LIMIT_TEXT);
+  }
+  if ((await store.countSince(ownerId, iso(now - DAY_MS))) >= MAX_PER_DAY) {
+    return fail(429, DAILY_LIMIT_TEXT);
+  }
+
+  const checked = validateSubmission(input, { blobHost });
+  if (!checked.ok) return fail(400, checked.error);
+  const fields = checked.value;
+  if (isFirstPartyId(fields.slug, firstPartyIds)) return fail(409, SLUG_TAKEN_TEXT);
+
+  try {
+    const submission = await store.insertSubmission({ owner_id: ownerId, ...columns(fields), status: 'pending' });
+    return { ok: true, value: ownerView(submission) };
+  } catch (err) {
+    if (isUniqueViolation(err)) return fail(409, SLUG_TAKEN_TEXT);
+    const limited = databaseFailure(err);
+    if (limited) return limited;
+    throw err;
+  }
+}
+
+/**
+ * The caller's own submissions, newest first.
+ * @param {{ store: Store, ownerId: string }} args
+ * @returns {Promise<Array<Omit<Submission, 'reviewed_by'>>>}
+ */
+export async function listOwnSubmissions({ store, ownerId }) {
+  return (await store.listOwnSubmissions(ownerId)).map(ownerView);
+}
+
+/**
+ * The caller's own submission. A missing row, a malformed id and another owner's row all give the same 404.
+ * @param {{ store: Store, ownerId: string, id: string }} args
+ * @returns {Promise<SubmissionResult<Omit<Submission, 'reviewed_by'>>>}
+ */
+export async function getOwnSubmission({ store, ownerId, id }) {
+  const row = await ownedRow(store, ownerId, id);
+  return row ? { ok: true, value: ownerView(row) } : notFound();
+}
+
+/**
+ * Edits the caller's own submission. Any edit sets it to pending and clears the review note, the reviewer and the review
+ * time. The save only applies if the row still has the status it was read with, so an admin's review that lands in
+ * between is not overwritten: that gives 409. The fields are checked as in createSubmission, including blobHost and
+ * firstPartyIds. An approved submission has to leave the site, so rebuild runs once after the save. The save stands
+ * even if the rebuild fails.
+ * @param {{
+ *   store: Store, ownerId: string, id: string, input: unknown, now: number, rebuild: Rebuild,
+ *   firstPartyIds?: Iterable<string>, blobHost?: string,
+ * }} args
+ * @returns {Promise<SubmissionResult<{ submission: Omit<Submission, 'reviewed_by'>, wasApproved: boolean, rebuild: RebuildResult | null }>>}
+ */
+export async function updateSubmission({ store, ownerId, id, input, now, rebuild, firstPartyIds = [], blobHost }) {
+  const current = await ownedRow(store, ownerId, id);
+  if (!current) return notFound();
+
+  const checked = validateSubmission(input, { blobHost });
+  if (!checked.ok) return fail(400, checked.error);
+  const fields = checked.value;
+  if (isFirstPartyId(fields.slug, firstPartyIds)) return fail(409, SLUG_TAKEN_TEXT);
+
+  // Editing sets the row back to pending, so it counts against the pending cap as a create does.
+  if (current.status !== 'pending' && (await store.countPending(ownerId)) >= MAX_PENDING) {
+    return fail(429, PENDING_LIMIT_TEXT);
+  }
+
+  const wasApproved = current.status === 'approved';
+  /** @type {Submission | null} */
+  let submission;
+  try {
+    submission = await store.updateSubmissionIf(id, { status: current.status }, {
+      ...columns(fields),
+      status: 'pending',
+      review_note: null,
+      reviewed_by: null,
+      reviewed_at: null,
+      updated_at: iso(now),
+    });
+  } catch (err) {
+    if (isUniqueViolation(err)) return fail(409, SLUG_TAKEN_TEXT);
+    const limited = databaseFailure(err);
+    if (limited) return limited;
+    throw err;
+  }
+  if (!submission) return fail(409, CHANGED_TEXT);
+
+  const rebuildResult = wasApproved ? await runRebuild(rebuild) : null;
+  return { ok: true, value: { submission: ownerView(submission), wasApproved, rebuild: rebuildResult } };
+}
+
+/**
+ * Deletes the caller's own submission. An approved one has to leave the site, so rebuild runs once. It runs in a
+ * finally block, so a delete that commits and then throws still rebuilds, as deleteAccount does.
+ * @param {{ store: Store, ownerId: string, id: string, rebuild: Rebuild }} args
+ * @returns {Promise<SubmissionResult<{ wasApproved: boolean, rebuild: RebuildResult | null }>>}
+ */
+export async function deleteSubmission({ store, ownerId, id, rebuild }) {
+  const current = await ownedRow(store, ownerId, id);
+  if (!current) return notFound();
+
+  const wasApproved = current.status === 'approved';
+  /** @type {RebuildResult | null} */
+  let rebuildResult = null;
+  try {
+    await store.deleteSubmission(id);
+  } finally {
+    if (wasApproved) rebuildResult = await runRebuild(rebuild);
+  }
+  return { ok: true, value: { wasApproved, rebuild: rebuildResult } };
+}
+
+/**
+ * The file type found from the leading bytes, or null when no known signature matches.
+ * @param {Buffer} buffer
+ * @returns {'png' | 'jpg' | 'webp' | null}
+ */
+function detectExtension(buffer) {
+  if (buffer.length >= 8 && buffer.subarray(0, 8).equals(PNG_SIGNATURE)) return 'png';
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'jpg';
+  if (
+    buffer.length >= 12 &&
+    buffer.subarray(0, 4).toString('latin1') === 'RIFF' &&
+    buffer.subarray(8, 12).toString('latin1') === 'WEBP'
+  ) {
+    return 'webp';
+  }
+  return null;
+}
+
+/**
+ * Checks an uploaded thumbnail by its bytes, not its name. It must be 1 MB or less, and its signature must match the
+ * declared type. SVG and anything else with no known signature is refused.
+ * @param {Buffer} buffer
+ * @param {string} declaredType The Content-Type the upload declared, with or without parameters.
+ * @returns {SubmissionResult<{ extension: 'png' | 'jpg' | 'webp' }>}
+ */
+export function checkThumbnail(buffer, declaredType) {
+  if (buffer.length > MAX_THUMBNAIL_BYTES) return fail(413, 'Image must be 1 MB or less');
+  const declared = DECLARED_TYPES.get(String(declaredType).split(';')[0].trim().toLowerCase());
+  const detected = detectExtension(buffer);
+  if (declared === undefined || detected === null || declared !== detected) {
+    return fail(415, 'Upload a PNG, JPEG or WebP image');
+  }
+  return { ok: true, value: { extension: detected } };
+}
