@@ -194,3 +194,12 @@ test('loadGames drops a min size outside 200 to 4000 or not a number, and keeps 
   assert.equal(game.minHeightLandscape, 200);
   assert.equal(warn.mock.callCount(), 0);
 });
+
+test('game page shows About and How it was made sections when set', async () => {
+  const { aboutHtml } = await import('./seo.mjs');
+  const html = aboutHtml({ ...base, about: 'A <b>fun</b> game.', howItWasMade: 'Made with AI.' });
+  assert.match(html, /<h2>About Demo<\/h2>/);
+  assert.match(html, /A &lt;b&gt;fun&lt;\/b&gt; game\./);
+  assert.match(html, /<h2>How it was made<\/h2>/);
+  assert.equal(aboutHtml(base), '');
+});

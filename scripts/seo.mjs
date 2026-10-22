@@ -31,6 +31,7 @@ export const PAGES_DIR = join(ROOT, 'games');
  * @property {string} [seoTitle]
  * @property {string} [longDescription]
  * @property {string} [howItWasMade]
+ * @property {string} [about]
  * @property {number} [minPlayers]
  * @property {number} [maxPlayers]
  * @property {number} [minWidth] Play-page minimum size (CSS px), 200 to 4000, same as src/games.ts. Used when the game is framed.
@@ -150,6 +151,7 @@ export function loadGames(file = join(ROOT, 'public/games.json')) {
       seoTitle: isNonEmptyString(r.seoTitle) ? r.seoTitle.trim() : undefined,
       longDescription: isNonEmptyString(r.longDescription) ? r.longDescription.trim() : undefined,
       howItWasMade: isNonEmptyString(r.howItWasMade) ? r.howItWasMade.trim() : undefined,
+      about: isNonEmptyString(r.about) ? r.about.trim() : undefined,
       minPlayers,
       maxPlayers: maxPlayers && minPlayers && maxPlayers < minPlayers ? minPlayers : maxPlayers,
       author: isNonEmptyString(r.author) ? r.author.trim() : DEFAULT_AUTHOR,
@@ -349,6 +351,14 @@ function gameJsonLd(g) {
   return jsonLd(game);
 }
 
+/** Readable text below the game card, so search engines get more than a one-liner. @param {Game} g */
+export function aboutHtml(g) {
+  const sections = [];
+  if (g.about) sections.push(`<h2>About ${esc(g.name)}</h2>\n        <p>${esc(g.about)}</p>`);
+  if (g.howItWasMade) sections.push(`<h2>How it was made</h2>\n        <p>${esc(g.howItWasMade)}</p>`);
+  return sections.length ? `\n      <section class="gp-about">\n        ${sections.join('\n        ')}\n      </section>` : '';
+}
+
 /** @param {Game} g */
 export function gamePageHtml(g) {
   const players = playersText(g);
@@ -400,7 +410,7 @@ export function gamePageHtml(g) {
             ${playButtons}${source}
           </div>
         </div>
-      </article>
+      </article>${aboutHtml(g)}
     </main>
     <footer class="footer wrap">
       <p>Free to play. Sign up to share your own game.</p>

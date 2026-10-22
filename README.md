@@ -63,7 +63,7 @@ npm run preview  # serve dist/ locally
 
 4. Run `npm run build`, then commit and push. The game's card, its `/games/<id>/` page, the home JSON-LD and `sitemap.xml` are all generated from `games.json` (see [SEO](#seo)).
 
-   Optional SEO fields: `longDescription` (game page text and meta description), `seoTitle` (overrides the derived `<title>`), `minPlayers` / `maxPlayers` (players badge and JSON-LD `numberOfPlayers`), `author` (JSON-LD, defaults to Devin Norris).
+   Optional SEO fields: `longDescription` (game page text and meta description), `about` (a longer "About" paragraph on the game page; `howItWasMade` also shows there), `seoTitle` (overrides the derived `<title>`), `minPlayers` / `maxPlayers` (players badge and JSON-LD `numberOfPlayers`), `author` (JSON-LD, defaults to Devin Norris).
 
 ## SEO
 
