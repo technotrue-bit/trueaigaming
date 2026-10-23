@@ -3,7 +3,7 @@ import { slugFromName, validateSubmission, type SubmissionFields } from '../shar
 import { ApiError, apiFetch } from './api';
 import { SUBMISSIONS_ENABLED, supabase } from './client';
 
-const CLOSED = 'Submissions are not open yet';
+const CLOSED = "Sharing your own game isn't open yet. Check back soon.";
 const LOADING = 'Loading…';
 const FALLBACK = 'Something went wrong, try again.';
 const CREATED_URL = '/account/submissions?created=1';
@@ -263,8 +263,9 @@ function wire(): void {
   updateCounts();
 }
 
-// The flag is checked before anything else. When it is off, the only thing shown is the notice.
+// The flag is checked before anything else. When it is off, only the page head (with its way back) and the notice show.
 if (!SUBMISSIONS_ENABLED) {
+  pageHead.hidden = false;
   showNotice(CLOSED);
 } else {
   // Try again is registered first. The no-post guard below uses ?. so it cannot throw when the form is missing.

@@ -53,6 +53,8 @@ npm run preview  # serve dist/ locally
 
    The script loads the page at 1280×720, waits ~8 seconds for the game to render, then saves the PNG. With no arguments it re-captures Super Star Party.
 
+   Then save a WebP copy next to it, `public/thumbs/<id>.webp` (quality about 80, e.g. `cwebp -q 80 in.png -o out.webp`). It's optional but worth it: the WebP is about a sixth of the PNG's size. When it exists, the cards and game page serve it through a `<picture>` and keep the PNG as the fallback and for social cards.
+
 3. **If the game is NOT hosted on `*.vercel.app`**, add its origin to `frame-src` in the `Content-Security-Policy` header in [`vercel.json`](vercel.json). Otherwise the play page's iframe will be blocked:
 
    ```
