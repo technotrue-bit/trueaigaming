@@ -424,6 +424,7 @@ export function gamePageHtml(g) {
           <div class="gp-actions">
             ${playButtons}${source}
           </div>
+          <p class="gp-tip">Enjoying it? Tips keep the games free. <a class="btn btn-tip" href="${KOFI_URL}" target="_blank" rel="noopener">Support on Ko-fi</a></p>
         </div>
       </article>${aboutHtml(g)}
     </main>
