@@ -35,10 +35,23 @@ function csp() {
 }
 const directive = (/** @type {string} */ name) => csp().split('; ').find((d) => d.startsWith(`${name} `))?.slice(name.length + 1);
 
-const COPY = 'Free to play. Sign up to share your own game.';
+const COPY = 'Free to play. No account needed.';
 
 test('home footer no longer says "No accounts"', () => {
   assert.ok(!read('index.html').includes('No accounts. Just games.'));
+});
+
+test('no footer promises a sign-up that may be switched off', () => {
+  for (const f of ['index.html', 'privacy.html', 'public/404.html']) {
+    assert.ok(!read(f).includes('Sign up to share'), f);
+    assert.ok(!read(f).includes('No accounts. Just games.'), f);
+  }
+});
+
+test('closed account pages keep their way back', () => {
+  for (const f of ['src/account/account.ts', 'src/account/submit.ts', 'src/account/submissions.ts']) {
+    assert.match(read(f), /if \(!SUBMISSIONS_ENABLED\) \{\n  pageHead\.hidden = false;/, f);
+  }
 });
 
 test('home footer has the new copy and the account and privacy links', () => {

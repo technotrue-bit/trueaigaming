@@ -7,6 +7,8 @@ export interface Game {
   description: string;
   playUrl: string;
   thumbnail: string;
+  /** Smaller WebP copy of a local thumbnail, set at build time when one exists. */
+  thumbnailWebp?: string;
   status: string;
   repo?: string;
   /** Submitted game hosted elsewhere: Play goes to playUrl in a new tab, never /play.html. */
@@ -73,6 +75,7 @@ function parseGame(raw: unknown): Game | null {
     description: typeof r.description === 'string' ? r.description : '',
     playUrl,
     thumbnail,
+    thumbnailWebp: safeLocalPath(r.thumbnailWebp) ?? undefined,
     status: isNonEmptyString(r.status) ? r.status.toLowerCase() : 'live',
     repo: safeHttpsUrl(r.repo) ?? undefined,
     external: r.external === true ? true : undefined,

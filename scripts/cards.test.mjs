@@ -39,10 +39,35 @@ test('card shows the player range from minPlayers and maxPlayers', () => {
   assert.ok(!cardHtml(base, 0).includes('card-facts'));
 });
 
-test('play in browser is a text link, not a second gold button', () => {
+test('card has one Play button: no "Play in browser" link, no second gold button', () => {
   const html = cardHtml(base, 0);
-  assert.match(html, /<a class="btn btn-link" href="https:\/\/example\.com"[^>]*>Play in browser/);
+  assert.equal(html.match(/>Play now</g)?.length, 1);
+  assert.ok(!html.includes('Play in browser'));
+  assert.ok(!html.includes('href="https://example.com"'));
   assert.ok(!html.includes('btn-ghost'));
+});
+
+test('card uses a <picture> with the WebP source when the game has one', () => {
+  const html = cardHtml({ ...base, thumbnailWebp: '/thumbs/demo.webp' }, 0);
+  assert.ok(html.includes('<picture><source type="image/webp" srcset="/thumbs/demo.webp" /><img src="/thumbs/demo.png" alt="Demo screenshot"'));
+  assert.ok(html.includes('</picture><span class="status status-live">'));
+});
+
+test('card without a WebP keeps a plain <img>', () => {
+  const html = cardHtml(base, 0);
+  assert.ok(!html.includes('<picture>'));
+  assert.ok(html.includes('<img src="/thumbs/demo.png" alt="Demo screenshot"'));
+});
+
+test('game page uses the WebP source too, and keeps the PNG for social cards', () => {
+  const html = gamePageHtml({ ...base, thumbnailWebp: '/thumbs/demo.webp' });
+  assert.ok(html.includes('<picture><source type="image/webp" srcset="/thumbs/demo.webp" /><img src="/thumbs/demo.png"'));
+  assert.ok(html.includes('<meta property="og:image" content="https://trueaigaming.com/thumbs/demo.png" />'));
+});
+
+test('loadGames finds the WebP next to a local PNG thumbnail', () => {
+  const ssp = loadGames().find((g) => g.id === 'super-star-party');
+  assert.equal(ssp?.thumbnailWebp, '/thumbs/super-star-party.webp');
 });
 
 test('grid always ends with the "more games soon" placeholder', () => {
@@ -55,7 +80,7 @@ const external = { ...base, id: 'ext-game', name: 'Ext Game', playUrl: 'https://
 
 test('external card: primary Play goes to playUrl in a new tab, no /play.html link', () => {
   const html = cardHtml(external, 0);
-  assert.ok(html.includes('<a class="btn btn-primary" href="https://ext.example/play" target="_blank" rel="noopener noreferrer">Play</a>'));
+  assert.ok(html.includes('<a class="btn btn-primary btn-play" href="https://ext.example/play" target="_blank" rel="noopener noreferrer">Play now</a>'));
   assert.match(html, /<a class="card-cover" href="https:\/\/ext\.example\/play" target="_blank" rel="noopener noreferrer" aria-label="Play Ext Game \(opens in a new tab\)">/);
   assert.ok(html.includes(`<img src="${BLOB}"`));
   assert.ok(!html.includes('/play.html'));
@@ -68,18 +93,18 @@ test('external card: no "Play in browser" duplicate, Source link kept', () => {
   assert.match(html, /<a class="btn btn-link" href="https:\/\/github\.com\/example\/ext" target="_blank" rel="noopener">Source<\/a>/);
 });
 
-test('user game card keeps its /play.html cover and Play here button', () => {
+test('user game card keeps its /play.html cover and Play now button', () => {
   const html = cardHtml(base, 0);
   assert.match(html, /<a class="card-cover" href="\/play\.html\?id=demo"/);
-  assert.match(html, /<a class="btn btn-primary" href="\/play\.html\?id=demo">Play here<\/a>/);
+  assert.match(html, /<a class="btn btn-primary btn-play" href="\/play\.html\?id=demo">Play now<\/a>/);
 });
 
 test('external game page: Play buttons open playUrl in a new tab, no /play.html link', () => {
   const html = gamePageHtml(external);
-  assert.ok(html.includes('<a class="btn btn-primary btn-lg" href="https://ext.example/play" target="_blank" rel="noopener noreferrer">Play</a>'));
+  assert.ok(html.includes('<a class="btn btn-primary btn-lg" href="https://ext.example/play" target="_blank" rel="noopener noreferrer">Play now</a>'));
   assert.match(html, /<a class="gp-shot card-cover" href="https:\/\/ext\.example\/play" target="_blank" rel="noopener noreferrer" aria-label="Play Ext Game \(opens in a new tab\)">/);
   assert.ok(!html.includes('/play.html'));
-  assert.ok(!html.includes('Play in browser'));
+  assert.ok(!html.includes('Open in a new tab'));
 });
 
 /** Writes a games.json fixture into a temp folder that the test removes afterwards. */
@@ -158,10 +183,22 @@ test('browser loader (src/games.ts) rejects credentialed blob thumbnails and kee
   assert.equal(games[0].thumbnail, BLOB);
 });
 
-test('hosted game page keeps its /play.html Play buttons and Play in browser link', () => {
+test('src/games.ts keeps a same-origin thumbnailWebp and drops any other', async (t) => {
+  const { loadGames: loadBrowserGames } = await importBrowserGames();
+  const respond = (thumbnailWebp) => async () => ({ ok: true, json: async () => [{ ...entry, thumbnail: '/thumbs/ext.png', thumbnailWebp }] });
+
+  t.mock.method(globalThis, 'fetch', respond('/thumbs/ext.webp'));
+  assert.equal((await loadBrowserGames())[0].thumbnailWebp, '/thumbs/ext.webp');
+
+  t.mock.method(globalThis, 'fetch', respond('https://evil.example/x.webp'));
+  assert.equal((await loadBrowserGames())[0].thumbnailWebp, undefined);
+});
+
+test('hosted game page: big Play now button, and a quieter new-tab link', () => {
   const html = gamePageHtml(base);
-  assert.ok(html.includes('<a class="btn btn-primary btn-lg" href="/play.html?id=demo">Play here</a>'));
-  assert.ok(html.includes('<a class="btn btn-ghost" href="https://example.com" target="_blank" rel="noopener">Play in browser ↗</a>'));
+  assert.ok(html.includes('<a class="btn btn-primary btn-lg" href="/play.html?id=demo">Play now</a>'));
+  assert.ok(html.includes('<a class="btn btn-link" href="https://example.com" target="_blank" rel="noopener">Open in a new tab ↗</a>'));
+  assert.ok(!html.includes('btn-ghost'));
   assert.ok(html.includes('<a class="gp-shot card-cover" href="/play.html?id=demo" aria-label="Play Demo">'));
 });
 

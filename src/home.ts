@@ -7,7 +7,8 @@ const count = document.getElementById('count') as HTMLParagraphElement;
 
 attachFeedback(document.getElementById('feedback') as HTMLButtonElement);
 
-function card(game: Game, index: number): HTMLLIElement {
+/** The thumbnail, with a WebP source when there is one. Same markup as thumbHtml() in scripts/seo.mjs. */
+function thumbImg(game: Game, index: number): HTMLElement {
   const img = el('img', {
     src: game.thumbnail,
     alt: `${game.name} screenshot`,
@@ -16,6 +17,11 @@ function card(game: Game, index: number): HTMLLIElement {
     decoding: 'async',
     loading: index < 2 ? 'eager' : 'lazy',
   });
+  return game.thumbnailWebp ? el('picture', {}, el('source', { type: 'image/webp', srcset: game.thumbnailWebp }), img) : img;
+}
+
+function card(game: Game, index: number): HTMLLIElement {
+  const img = thumbImg(game, index);
 
   // Hosted games play at /play.html. External games open their own site in a new tab (same as scripts/seo.mjs).
   const playLink = game.external
@@ -28,10 +34,8 @@ function card(game: Game, index: number): HTMLLIElement {
     el('span', { class: statusClass(game.status) }, game.status),
   );
 
-  const actions = el('div', { class: 'card-actions' }, el('a', { class: 'btn btn-primary', ...playLink }, game.external ? 'Play' : 'Play here'));
-  if (!game.external) {
-    actions.append(el('a', { class: 'btn btn-link', href: game.playUrl, target: '_blank', rel: 'noopener' }, 'Play in browser ↗'));
-  }
+  // One Play button. The play page's own controls can still open a hosted game in a new tab.
+  const actions = el('div', { class: 'card-actions' }, el('a', { class: 'btn btn-primary btn-play', ...playLink }, 'Play now'));
   if (game.repo) {
     actions.append(el('a', { class: 'btn btn-link', href: game.repo, target: '_blank', rel: 'noopener' }, 'Source'));
   }

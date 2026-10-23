@@ -192,6 +192,9 @@ a {
   aspect-ratio: 16 / 9;
   background: var(--bg-2);
 }
+.card-cover picture {
+  display: contents;
+}
 .card-cover img {
   display: block;
   width: 100%;
@@ -854,9 +857,13 @@ a {
   }
 }
 
-/* "Play here" is the main action: give it the whole first row of the card. */
+/* "Play now" is the card's one main action: the whole first row, and bigger than the other buttons. */
 .card-actions .btn-primary {
   flex: 1 1 100%;
   justify-content: center;
   text-align: center;
+}
+.btn-play {
+  min-height: 52px;
+  font-size: 1.05rem;
 }

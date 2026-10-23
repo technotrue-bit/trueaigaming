@@ -1,7 +1,7 @@
 // @ts-check
 // Build-time SEO helpers: validated games.json, prerendered home cards, one static page per game,
 // JSON-LD and sitemap.xml. Used by vite.config.ts; nothing here ships to the browser.
-import { readFileSync, writeFileSync, mkdirSync, rmSync, openSync, readSync, closeSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync, openSync, readSync, closeSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { isBlobThumbnailUrl } from '../src/shared/submission-rules.mjs';
 
@@ -25,6 +25,7 @@ export const PAGES_DIR = join(ROOT, 'games');
  * @property {string} description
  * @property {string} playUrl
  * @property {string} thumbnail
+ * @property {string} [thumbnailWebp] Smaller WebP copy of a local PNG thumbnail, when public/ has one next to it.
  * @property {{ width: number, height: number }} thumbSize
  * @property {string} status
  * @property {string} [repo]
@@ -116,6 +117,23 @@ function imageSize(path) {
   }
 }
 
+/** The WebP next to a local PNG thumbnail (/thumbs/x.png -> /thumbs/x.webp), if that file exists. @param {string} path */
+function webpSibling(path) {
+  if (!path.startsWith('/') || !path.toLowerCase().endsWith('.png')) return undefined;
+  const webp = `${path.slice(0, -4)}.webp`;
+  return existsSync(join(ROOT, 'public', webp)) ? webp : undefined;
+}
+
+/**
+ * The thumbnail <img>, wrapped in a <picture> with a WebP source when there is one. Browsers without WebP, and
+ * social cards, still get the PNG. Same markup as thumbImg() in src/home.ts.
+ * @param {Game} g @param {string} imgAttrs everything on the <img> after src
+ */
+export function thumbHtml(g, imgAttrs) {
+  const img = `<img src="${esc(g.thumbnail)}" ${imgAttrs} />`;
+  return g.thumbnailWebp ? `<picture><source type="image/webp" srcset="${esc(g.thumbnailWebp)}" />${img}</picture>` : img;
+}
+
 /** @param {string} [file] games.json to read. Defaults to public/games.json. @returns {Game[]} */
 export function loadGames(file = join(ROOT, 'public/games.json')) {
   /** @type {unknown} */
@@ -146,6 +164,7 @@ export function loadGames(file = join(ROOT, 'public/games.json')) {
       playUrl,
       thumbnail,
       thumbSize: imageSize(thumbnail),
+      thumbnailWebp: webpSibling(thumbnail),
       status: isNonEmptyString(r.status) ? r.status.toLowerCase() : 'live',
       repo: safeHttpsUrl(r.repo) ?? undefined,
       seoTitle: isNonEmptyString(r.seoTitle) ? r.seoTitle.trim() : undefined,
@@ -261,12 +280,8 @@ const coverLabel = (g) => `Play ${esc(g.name)}${g.external ? ' (opens in a new t
 
 /** Same markup and classes as card() in src/home.ts. @param {Game} g @param {number} index */
 export function cardHtml(g, index) {
-  const actions = g.external
-    ? [`<a class="btn btn-primary" ${playAttrs(g)}>Play</a>`]
-    : [
-        `<a class="btn btn-primary" ${playAttrs(g)}>Play here</a>`,
-        `<a class="btn btn-link" href="${esc(g.playUrl)}" target="_blank" rel="noopener">Play in browser ↗</a>`,
-      ];
+  // One Play button. The play page's own controls can still open a hosted game in a new tab.
+  const actions = [`<a class="btn btn-primary btn-play" ${playAttrs(g)}>Play now</a>`];
   const players = playersText(g);
   const facts = players ? `<ul class="card-facts"><li>${esc(players)}</li></ul>` : '';
   if (g.repo) actions.push(`<a class="btn btn-link" href="${esc(g.repo)}" target="_blank" rel="noopener">Source</a>`);
@@ -277,7 +292,7 @@ export function cardHtml(g, index) {
   const how = g.howItWasMade ? `<div class="card-how" id="how-${id}" hidden><p>${esc(g.howItWasMade)}</p></div>` : '';
   return `<li class="card">
           <a class="card-cover" ${playAttrs(g)} aria-label="${coverLabel(g)}">
-            <img src="${esc(g.thumbnail)}" alt="${esc(g.name)} screenshot" width="1280" height="720" decoding="async" loading="${index < 2 ? 'eager' : 'lazy'}" /><span class="${statusClass(g.status)}">${esc(g.status)}</span>
+            ${thumbHtml(g, `alt="${esc(g.name)} screenshot" width="1280" height="720" decoding="async" loading="${index < 2 ? 'eager' : 'lazy'}"`)}<span class="${statusClass(g.status)}">${esc(g.status)}</span>
           </a>
           <div class="card-body">
             <div class="card-head">
@@ -365,9 +380,9 @@ export function gamePageHtml(g) {
   const longDesc = g.longDescription && g.longDescription !== g.description ? `\n          <p class="gp-long">${esc(g.longDescription)}</p>` : '';
   const source = g.repo ? `\n            <a class="btn btn-link" href="${esc(g.repo)}" target="_blank" rel="noopener">Source</a>` : '';
   const playButtons = g.external
-    ? `<a class="btn btn-primary btn-lg" ${playAttrs(g)}>Play</a>`
-    : `<a class="btn btn-primary btn-lg" ${playAttrs(g)}>Play here</a>
-            <a class="btn btn-ghost" href="${esc(g.playUrl)}" target="_blank" rel="noopener">Play in browser ↗</a>`;
+    ? `<a class="btn btn-primary btn-lg" ${playAttrs(g)}>Play now</a>`
+    : `<a class="btn btn-primary btn-lg" ${playAttrs(g)}>Play now</a>
+            <a class="btn btn-link" href="${esc(g.playUrl)}" target="_blank" rel="noopener">Open in a new tab ↗</a>`;
   return `<!doctype html>
 <!-- Generated by scripts/seo.mjs from public/games.json. Do not edit; changes are overwritten on every dev/build. -->
 <html lang="en">
@@ -398,7 +413,7 @@ export function gamePageHtml(g) {
       <a class="gp-back" href="/">← Back to all games</a>
       <article class="gp-game">
         <a class="gp-shot card-cover" ${playAttrs(g)} aria-label="${coverLabel(g)}">
-          <img src="${esc(g.thumbnail)}" alt="${esc(g.name)} screenshot" width="${g.thumbSize.width}" height="${g.thumbSize.height}" decoding="async" fetchpriority="high" /><span class="${statusClass(g.status)}">${esc(g.status)}</span>
+          ${thumbHtml(g, `alt="${esc(g.name)} screenshot" width="${g.thumbSize.width}" height="${g.thumbSize.height}" decoding="async" fetchpriority="high"`)}<span class="${statusClass(g.status)}">${esc(g.status)}</span>
         </a>
         <div class="gp-info">
           <h1 class="gp-title">${esc(g.name)}</h1>
@@ -413,7 +428,7 @@ export function gamePageHtml(g) {
       </article>${aboutHtml(g)}
     </main>
     <footer class="footer wrap">
-      <p>Free to play. Sign up to share your own game.</p>
+      <p>Free to play. No account needed.</p>
       <p><a href="/account">Sign in or share your game</a> &middot; <a href="/privacy.html">Privacy</a></p>
       <p class="tip">Tips keep the games free. <a class="btn btn-tip" href="${KOFI_URL}" target="_blank" rel="noopener">Support on Ko-fi</a></p>
       <p class="tip"><a class="btn btn-tip" href="${X_URL}" target="_blank" rel="noopener">Follow @ItsMeTrueG on X</a></p>

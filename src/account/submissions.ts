@@ -2,7 +2,7 @@ import '../style.css';
 import { ApiError, apiFetch } from './api';
 import { SUBMISSIONS_ENABLED } from './client';
 
-const CLOSED = 'Submissions are not open yet';
+const CLOSED = "Sharing your own game isn't open yet. Check back soon.";
 const LOADING = 'Loading…';
 const FALLBACK = 'Something went wrong, try again.';
 const DELETE_CONFIRM = "Delete this game? This can't be undone.";
@@ -152,8 +152,9 @@ function wire(): void {
   });
 }
 
-// The flag is checked before anything else. When it is off, the only thing shown is the notice.
+// The flag is checked before anything else. When it is off, only the page head (with its way back) and the notice show.
 if (!SUBMISSIONS_ENABLED) {
+  pageHead.hidden = false;
   showNotice(CLOSED);
 } else {
   // Registered outside wire(), so Try again works even when wire() throws on a missing element.
