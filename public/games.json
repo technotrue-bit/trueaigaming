@@ -18,7 +18,7 @@
     "name": "Flag Catch",
     "description": "3D capture the flag with animal teams",
     "longDescription": "Flag Catch is a free 3D capture the flag game that runs right in your browser. Pick an animal, sneak into enemy land, grab a flag and race it home. Built with AI, with nothing to install.",
-    "about": "Flag Catch is a free capture the flag game for phones and computers, with nothing to install. You pick an animal (a lion on a quad bike, a mammoth on a skateboard, a narwhal, a bat and more) and join a team of 8 to 64 against a rival team on an island split into three lands. Sneak into enemy land, grab a flag and carry it home while firecrackers, power ups and defenders try to stop you. Medics plant respawn flags, Hoard mode plays to a points target, and Playful mode is one flag a side. Eight worlds, from Home Isle to a lava island, open up as you earn points. It plays best on a phone held sideways.",
+    "about": "Flag Catch is a free capture the flag game for phones and computers, with nothing to install. You pick an animal (a lion on a quad bike, a mammoth on a skateboard, a narwhal, a bat and more) and join a team of 8 to 64 against a rival team on an island split into three lands. Sneak into enemy land, grab a flag and carry it home while firecrackers, power ups and defenders try to stop you. Medics plant respawn flags, Hoard mode plays to a points target, and Playful mode is one flag a side. Eight worlds, from Home Isle to a lava island, open up as you earn points. Play with your phone held sideways, or switch on DS mode to hold it upright with the game on a top screen and the map and buttons on a bottom one.",
     "howItWasMade": "Built with AI coding agents in phases, from the core rules to worlds, animals, menus and sound. Every model, animation, sound and song is generated in code with three.js and Web Audio, with no art files.",
     "minPlayers": 1,
     "maxPlayers": 1,
@@ -26,6 +26,8 @@
     "thumbnail": "/thumbs/flag-catch.png",
     "status": "live",
     "repo": "https://github.com/technotrue-bit/Flag-Catch",
+    "minWidth": 340,
+    "minHeight": 520,
     "minWidthLandscape": 560,
     "minHeightLandscape": 280
   }
