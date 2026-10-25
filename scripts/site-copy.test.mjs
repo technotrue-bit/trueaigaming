@@ -103,3 +103,30 @@ test('privacy.html names the owner contact and has no script of its own', () => 
 test('privacy.html is a build input', () => {
   assert.match(read('vite.config.ts'), /privacy: resolve\(import\.meta\.dirname, 'privacy\.html'\)/);
 });
+
+const RIGHTS = '&copy; 2026 Joey Devin Norris. All rights reserved.';
+
+test('every footer carries the copyright line and a Terms link', () => {
+  const pages = [
+    ['index.html', footer(read('index.html'))],
+    ['privacy.html', footer(read('privacy.html'))],
+    ['terms.html', footer(read('terms.html'))],
+    ...loadGames().map((g) => [g.id, footer(gamePageHtml(g))]),
+  ];
+  for (const [name, f] of pages) {
+    assert.ok(f.includes(RIGHTS), name);
+    assert.match(f, /<a [^>]*href="\/terms\.html"[^>]*>Terms<\/a>/, name);
+  }
+  assert.ok(read('public/404.html').includes(RIGHTS));
+});
+
+test('terms.html is a build input, names the owner and has no script of its own', () => {
+  const html = read('terms.html');
+  assert.match(read('vite.config.ts'), /terms: resolve\(import\.meta\.dirname, 'terms\.html'\)/);
+  assert.ok(html.includes('owned by Joey Devin Norris. All rights reserved.'));
+  assert.ok(!/<script(?![^>]*\bsrc=)/i.test(html), 'no inline script');
+});
+
+test('the repo has an all-rights-reserved LICENSE', () => {
+  assert.match(read('LICENSE'), /^Copyright \(c\) 2026 Joey Devin Norris\. All rights reserved\./);
+});

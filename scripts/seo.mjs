@@ -430,9 +430,10 @@ export function gamePageHtml(g) {
     </main>
     <footer class="footer wrap">
       <p>Free to play. No account needed.</p>
-      <p><a href="/account">Sign in or share your game</a> &middot; <a href="/privacy.html">Privacy</a></p>
+      <p><a href="/account">Sign in or share your game</a> &middot; <a href="/privacy.html">Privacy</a> &middot; <a href="/terms.html">Terms</a></p>
       <p class="tip">Tips keep the games free. <a class="btn btn-tip" href="${KOFI_URL}" target="_blank" rel="noopener">Support on Ko-fi</a></p>
       <p class="tip"><a class="btn btn-tip" href="${X_URL}" target="_blank" rel="noopener">Follow @ItsMeTrueG on X</a></p>
+      <p class="legal">&copy; 2026 Joey Devin Norris. All rights reserved.</p>
     </footer>
     <button id="feedback" class="feedback-fab feedback-pill" type="button" aria-label="Feedback: report a bug or add suggestions">Feedback</button>
     <script type="module" src="/src/game-page.ts"></script>

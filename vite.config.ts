@@ -90,6 +90,7 @@ export default defineConfig(async () => {
           admin: resolve(import.meta.dirname, 'admin.html'),
           profile: resolve(import.meta.dirname, 'profile.html'),
           privacy: resolve(import.meta.dirname, 'privacy.html'),
+          terms: resolve(import.meta.dirname, 'terms.html'),
           ...writeGamePages(games),
         },
       },
