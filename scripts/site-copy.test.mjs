@@ -11,7 +11,8 @@ const footer = (/** @type {string} */ html) => html.match(/<footer class="footer
 
 const SUPABASE_ORIGIN = 'https://ycajnupfbiushygycclf.supabase.co';
 const BLOB_HOST = 'https://*.public.blob.vercel-storage.com';
-const FRAME_SRC = 'https://super-star-party.vercel.app https://*.vercel.app';
+const TURNSTILE = 'https://challenges.cloudflare.com';
+const FRAME_SRC = `https://super-star-party.vercel.app https://*.vercel.app ${TURNSTILE}`;
 // Google Analytics 4 (gtag.js): the loader, its inline config snippet, and where it sends hits.
 const GTM = 'https://www.googletagmanager.com';
 const GA_CONNECT = `https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com ${GTM}`;
@@ -21,7 +22,7 @@ const EXPECTED_CSP = [
   `connect-src 'self' ${SUPABASE_ORIGIN} ${GA_CONNECT}`,
   `img-src 'self' data: ${BLOB_HOST} ${GA_IMG}`,
   "style-src 'self' 'unsafe-inline'",
-  `script-src 'self' 'unsafe-inline' ${GTM}`,
+  `script-src 'self' 'unsafe-inline' ${GTM} ${TURNSTILE}`,
   `frame-src ${FRAME_SRC}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
@@ -85,7 +86,7 @@ test('CSP img-src includes the Vercel Blob host', () => {
   assert.ok(directive('img-src')?.split(' ').includes(BLOB_HOST));
 });
 
-test('CSP frame-src is unchanged (still no user origins)', () => {
+test('CSP frame-src adds only the bot check (still no user origins)', () => {
   assert.equal(directive('frame-src'), FRAME_SRC);
 });
 
@@ -133,4 +134,21 @@ test('terms.html is a build input, names the owner and has no script of its own'
 
 test('the repo has an all-rights-reserved LICENSE', () => {
   assert.match(read('LICENSE'), /^Copyright \(c\) 2026 TrueAIGaming\. All rights reserved\./);
+});
+
+test('sign-up asks for a birth month and year before anything else, and says the date is not kept', () => {
+  const html = read('account.html');
+  const form = html.match(/<form id="signup-form"[\s\S]*?<\/form>/)?.[0] ?? '';
+  assert.ok(form.indexOf('name="birth_month"') > -1 && form.indexOf('name="birth_month"') < form.indexOf('name="email"'));
+  assert.ok(form.includes('name="birth_year"'));
+  assert.ok(form.includes("We don't keep your date of birth."));
+  // A neutral question: the form must not hint at the age that passes.
+  assert.ok(!form.includes('13'));
+  assert.match(html, /<p id="signup-closed" hidden>/);
+});
+
+test('privacy and terms say accounts are for 13 and up', () => {
+  assert.ok(read('privacy.html').includes('Accounts are for people 13 and up.'));
+  assert.ok(read('terms.html').includes('accounts are for people 13 and up'));
+  assert.match(read('terms.html'), /<h2>Games you share<\/h2>/);
 });

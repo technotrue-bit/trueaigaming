@@ -1,12 +1,15 @@
 import '../style.css';
-import { validateDisplayName, validateHandle, validatePassword } from '../shared/submission-rules.mjs';
+import { checkSignupAge, validateDisplayName, validateHandle, validatePassword } from '../shared/submission-rules.mjs';
 import { ApiError, apiFetch } from './api';
+import { CaptchaError, CaptchaSlot } from './captcha';
 import { SUBMISSIONS_ENABLED, supabase } from './client';
 
 const CLOSED = "Sharing your own game isn't open yet. Check back soon.";
 const LOADING = 'Loading…';
 const FALLBACK = 'Something went wrong, try again.';
 const DELETE_CONFIRM = "Delete your account and all your games? This can't be undone.";
+/** Set for the rest of the browser session once the age check says no, so going back and changing the date does not help. */
+const AGE_BLOCK_KEY = 'tag-signup-closed';
 
 type Screen = 'signed-out' | 'unverified' | 'verified' | 'handle-setup' | 'new-password';
 const SCREENS: Screen[] = ['signed-out', 'unverified', 'verified', 'handle-setup', 'new-password'];
@@ -31,6 +34,7 @@ const retry = byId<HTMLButtonElement>('retry');
 const handleText = byId<HTMLElement>('handle');
 const signupForm = byId<HTMLFormElement>('signup-form');
 const signupSubmit = byId<HTMLButtonElement>('signup-submit');
+const signupClosed = byId<HTMLParagraphElement>('signup-closed');
 const signinForm = byId<HTMLFormElement>('signin-form');
 const signinSubmit = byId<HTMLButtonElement>('signin-submit');
 const forgot = byId<HTMLButtonElement>('forgot');
@@ -43,6 +47,11 @@ const handleSave = byId<HTMLButtonElement>('handle-save');
 const handleSignOut = byId<HTMLButtonElement>('handle-sign-out');
 const newPasswordForm = byId<HTMLFormElement>('new-password-form');
 const newPasswordSave = byId<HTMLButtonElement>('new-password-save');
+const captcha = {
+  signup: new CaptchaSlot(byId<HTMLElement>('signup-captcha')),
+  signin: new CaptchaSlot(byId<HTMLElement>('signin-captcha')),
+  resend: new CaptchaSlot(byId<HTMLElement>('resend-captcha')),
+};
 const statusEls = {
   signup: byId<HTMLElement>('signup-status'),
   signin: byId<HTMLElement>('signin-status'),
@@ -75,6 +84,11 @@ function showScreen(screen: Screen | null): void {
   if (recovering && screen !== 'new-password') return;
   for (const id of SCREENS) byId<HTMLElement>(id).hidden = id !== screen;
   for (const el of Object.values(statusEls)) setStatus(el, '');
+  if (screen === 'signed-out') {
+    captcha.signup.start();
+    captcha.signin.start();
+  }
+  if (screen === 'unverified') captcha.resend.start();
 }
 
 /**
@@ -82,7 +96,41 @@ function showScreen(screen: Screen | null): void {
  * the missing-config error (which names VITE_ variables), gets the fixed text.
  */
 function messageFor(err: unknown): string {
-  return err instanceof ApiError ? err.message : FALLBACK;
+  return err instanceof ApiError || err instanceof CaptchaError ? err.message : FALLBACK;
+}
+
+/** Storage can be blocked, such as in some private windows. Then the block lasts only until the page reloads. */
+function ageBlocked(): boolean {
+  try {
+    return sessionStorage.getItem(AGE_BLOCK_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Hides the sign-up form for this session. Sign-in stays, since someone else may share the device. */
+function closeSignup(): void {
+  try {
+    sessionStorage.setItem(AGE_BLOCK_KEY, '1');
+  } catch {
+    // Blocked storage: the form still closes for this page view.
+  }
+  signupForm.reset();
+  signupForm.hidden = true;
+  signupClosed.hidden = false;
+}
+
+/**
+ * Runs one Supabase call that needs a bot-check token, then readies a fresh token, since each works once. A check
+ * the person has not finished yet is left as it is.
+ */
+async function withCaptcha(slot: CaptchaSlot, call: (token: string | undefined) => Promise<void>): Promise<void> {
+  const token = await slot.token();
+  try {
+    await call(token);
+  } finally {
+    slot.reset();
+  }
 }
 
 /** Supabase reports an unconfirmed email with this code. Only the code is read. The message is never shown. */
@@ -158,6 +206,11 @@ function signOutFrom(control: HTMLButtonElement, out: HTMLElement): void {
 }
 
 function wire(): void {
+  if (ageBlocked()) {
+    signupForm.hidden = true;
+    signupClosed.hidden = false;
+  }
+
   // Registered before the first route(), so a password-reset event during session setup is not missed.
   supabase.auth.onAuthStateChange((event) => {
     if (event !== 'PASSWORD_RECOVERY') return;
@@ -168,6 +221,16 @@ function wire(): void {
   signupForm.addEventListener('submit', (event) => {
     event.preventDefault();
     if (!signupForm.reportValidity()) return;
+    // The age check runs first, and nothing typed is sent anywhere when it says no. The date itself is never stored.
+    const age = checkSignupAge(fieldValue(signupForm, 'birth_month'), fieldValue(signupForm, 'birth_year').trim());
+    if (!age.ok) {
+      setStatus(statusEls.signup, age.error, true);
+      return;
+    }
+    if (age.value === 'too-young') {
+      closeSignup();
+      return;
+    }
     // Same rules as the server, so the messages match. The handle and display name become signup metadata.
     const handle = validateHandle(fieldValue(signupForm, 'handle'));
     const displayName = validateDisplayName(fieldValue(signupForm, 'display_name'));
@@ -179,15 +242,19 @@ function wire(): void {
     }
     const email = fieldValue(signupForm, 'email').trim();
     void attempt(signupSubmit, statusEls.signup, async () => {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password: password.value,
-        options: {
-          emailRedirectTo: `${location.origin}/account`,
-          data: { handle: handle.value, display_name: displayName.value },
-        },
+      await withCaptcha(captcha.signup, async (captchaToken) => {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password: password.value,
+          options: {
+            emailRedirectTo: `${location.origin}/account`,
+            captchaToken,
+            // age_confirmed records only that the age check passed. The server makes no profile without it.
+            data: { handle: handle.value, display_name: displayName.value, age_confirmed: true },
+          },
+        });
+        if (error) throw error;
       });
-      if (error) throw error;
       signupForm.reset();
       setStatus(statusEls.signup, 'Check your email to verify your account.');
     });
@@ -199,13 +266,17 @@ function wire(): void {
     const email = fieldValue(signinForm, 'email').trim();
     const password = fieldValue(signinForm, 'password');
     void attempt(signinSubmit, statusEls.signin, async () => {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      // Supabase refuses sign-in until the email is verified. Send the person to the verify panel so Resend is reachable.
-      if (isUnverified(error)) {
+      let unverified = false;
+      await withCaptcha(captcha.signin, async (captchaToken) => {
+        const { error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken } });
+        // Supabase refuses sign-in until the email is verified. Send the person to the verify panel so Resend is reachable.
+        unverified = isUnverified(error);
+        if (error && !unverified) throw error;
+      });
+      if (unverified) {
         showUnverified(email);
         return;
       }
-      if (error) throw error;
       await route();
     });
   });
@@ -217,16 +288,23 @@ function wire(): void {
       return;
     }
     void attempt(forgot, statusEls.signin, async () => {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/account` });
-      if (error) throw error;
+      await withCaptcha(captcha.signin, async (captchaToken) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${location.origin}/account`,
+          captchaToken,
+        });
+        if (error) throw error;
+      });
       setStatus(statusEls.signin, 'If an account exists for that email, a reset link is on its way.');
     });
   });
 
   resendBtn.addEventListener('click', () => {
     void attempt(resendBtn, statusEls.unverified, async () => {
-      const { error } = await supabase.auth.resend({ type: 'signup', email: pendingEmail });
-      if (error) throw error;
+      await withCaptcha(captcha.resend, async (captchaToken) => {
+        const { error } = await supabase.auth.resend({ type: 'signup', email: pendingEmail, options: { captchaToken } });
+        if (error) throw error;
+      });
       setStatus(statusEls.unverified, 'Verification email sent. Check your inbox.');
     });
   });

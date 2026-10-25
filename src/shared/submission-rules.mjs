@@ -1,6 +1,6 @@
 // @ts-check
-// Shared submission rules: handles, display names, passwords, slugs, HTTPS links, player counts and
-// whole game submissions. The API routes and the submit form both import this module, so the rules
+// Shared submission rules: handles, display names, passwords, the sign-up age check, slugs, HTTPS links,
+// player counts and whole game submissions. The API routes and the submit form both import this module, so the rules
 // and messages match. Plain JavaScript with no dependencies.
 
 /**
@@ -154,6 +154,34 @@ export function validatePassword(value) {
   if (typeof value !== 'string') return { ok: false, error: 'Password must be text' };
   if (codePoints(value) < 12) return { ok: false, error: 'Password must be at least 12 characters' };
   return { ok: true, value };
+}
+
+/** Accounts are for people this age and up. Playing needs no account, so younger players are never asked. */
+export const MIN_ACCOUNT_AGE = 13;
+
+/**
+ * Sign-up age check from a birth month (1 to 12) and year. Only the month is asked, so a birthday in the current
+ * month counts as not yet reached: someone who might be 12 is treated as 12. The result says only whether the
+ * person may sign up. The birth date itself is never stored or sent anywhere.
+ * @param {unknown} month
+ * @param {unknown} year
+ * @param {Date} [now]
+ * @returns {Result<'allowed' | 'too-young'>}
+ */
+export function checkSignupAge(month, year, now = new Date()) {
+  const m = typeof month === 'string' ? Number(month) : month;
+  const y = typeof year === 'string' ? Number(year) : year;
+  const thisYear = now.getFullYear();
+  if (typeof m !== 'number' || !Number.isInteger(m) || m < 1 || m > 12) {
+    return { ok: false, error: 'Choose your birth month' };
+  }
+  if (typeof y !== 'number' || !Number.isInteger(y) || y < thisYear - 120 || y > thisYear) {
+    return { ok: false, error: 'Enter your birth year' };
+  }
+  const thisMonth = now.getMonth() + 1;
+  if (y === thisYear && m > thisMonth) return { ok: false, error: 'Enter your birth month and year' };
+  const age = thisYear - y - (thisMonth <= m ? 1 : 0);
+  return { ok: true, value: age >= MIN_ACCOUNT_AGE ? 'allowed' : 'too-young' };
 }
 
 /**

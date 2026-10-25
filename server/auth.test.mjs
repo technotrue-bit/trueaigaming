@@ -28,7 +28,7 @@ const supabaseUser = {
   id: 'user-1',
   email: 'ada@example.com',
   email_confirmed_at: '2026-10-20T12:00:00.000Z',
-  user_metadata: { handle: 'ada', display_name: 'Ada' },
+  user_metadata: { handle: 'ada', display_name: 'Ada', age_confirmed: true },
 };
 
 test('readUser returns null, and does not call Supabase, when there is no Authorization header', async () => {
@@ -61,6 +61,7 @@ test('readUser returns the user with verified true, and handle and display name 
     verified: true,
     handle: 'ada',
     displayName: 'Ada',
+    ageConfirmed: true,
   });
 });
 
@@ -85,7 +86,16 @@ test('readUser gives empty handle and display name when user_metadata has neithe
     verified: false,
     handle: '',
     displayName: '',
+    ageConfirmed: false,
   });
+});
+
+test('readUser counts the age check only when age_confirmed is literally true', async () => {
+  for (const value of ['true', 1, 'yes', null]) {
+    const { fetchImpl } = fakeFetch(200, { ...supabaseUser, user_metadata: { handle: 'ada', age_confirmed: value } });
+    const user = await readUser(request(`Bearer ${token}`), deps(fetchImpl));
+    assert.equal(user.ageConfirmed, false, String(value));
+  }
 });
 
 test('readUser returns null on a 401, such as an expired token', async () => {

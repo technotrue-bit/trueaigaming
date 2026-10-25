@@ -44,8 +44,14 @@
         <li>Your sign-in session, kept in your browser so you stay signed in. Signing out removes it.</li>
       </ul>
 
+      <h2>Age</h2>
+      <p>Accounts are for people 13 and up. The sign-up form asks for your birth month and year to check this. The date itself is not kept or sent anywhere: the account only records that the check was passed. If you are under 13, you can still play every game without an account. If you think a child under 13 has made an account, message me (contact below) and I will delete it.</p>
+
+      <h2>Bot check</h2>
+      <p>The sign-up, sign-in and password reset forms use Cloudflare Turnstile to stop automated sign-ups. Turnstile runs in your browser on the account page only, and Cloudflare sees technical details such as your IP address and browser to tell people from bots. Its own privacy policy covers what it does with them.</p>
+
       <h2>Where it lives</h2>
-      <p>Account and game details are stored in Supabase. Uploaded thumbnail images are stored in Vercel Blob. The site itself is hosted on Vercel.</p>
+      <p>Account and game details are stored in Supabase. Uploaded thumbnail images are stored in Vercel Blob. The site itself is hosted on Vercel. Account emails, such as the email check and password reset, are sent through an email delivery service on the site's behalf, which sees your address only to deliver them.</p>
 
       <h2>Feedback</h2>
       <p>Anyone can send feedback without an account. The feedback form stores your message, the contact you choose to give (optional), your browser's user-agent string and a hashed version of your IP address, in a private Vercel Blob. I can remove a message on request (contact below).</p>

@@ -120,6 +120,7 @@ Players can sign in (Supabase) and submit games. Approved submissions are added 
 | `VITE_SUPABASE_URL`           | browser         | Same project URL, for the sign-in client.                                      |
 | `VITE_SUPABASE_ANON_KEY`      | browser         | Public anon key, for the sign-in client.                                       |
 | `BLOB_PUBLIC_HOST`            | server, build   | The Blob store's public host, such as `abc123.public.blob.vercel-storage.com`. **Set it before launch** (see below). |
+| `VITE_TURNSTILE_SITE_KEY`     | browser         | Public Cloudflare Turnstile site key. When set, sign-up, sign-in, reset and resend carry a bot-check token. Set it together with Supabase's CAPTCHA protection (see [the launch steps](docs/accounts-launch.md)). |
 | `SUBMISSIONS_ENABLED`         | server, build   | `true` turns the server side on (see below).                                   |
 | `VITE_SUBMISSIONS_ENABLED`    | browser         | `true` turns the pages on (see below).                                         |
 
@@ -128,5 +129,9 @@ Only the `VITE_` variables reach the browser (Vite inlines them at build time). 
 **`SUBMISSIONS_ENABLED`** is the launch switch. When it is not `true`, the account, submit, profile and admin pages show "Submissions are not open yet", the submission APIs answer 503, and the build lists no submitted games. Turn on `SUBMISSIONS_ENABLED` and `VITE_SUBMISSIONS_ENABLED` together, then redeploy. The build needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` when it is on, and fails if they are missing.
 
 **`BLOB_PUBLIC_HOST`** must be set before launch. When it is set, a submitted thumbnail must be on exactly that host, the build fails on an approved row whose thumbnail is on another host, and approving such a row is refused. When it is not set, any `*.public.blob.vercel-storage.com` store is accepted, so a thumbnail could point at someone else's store. Use the host only, with no `https://` and no trailing slash. Find it in the Vercel Blob store's settings (the part of a file's public URL before the first `/`).
+
+**Age.** Accounts are for people 13 and up. The sign-up form asks for a birth month and year, checks them with `checkSignupAge` in `src/shared/submission-rules.mjs`, and stores only `age_confirmed: true` in the signup metadata. A "no" closes the sign-up form for the rest of the browser session. The server makes no profile (so no submissions) for an account without that flag. Playing needs no account, so players are never asked.
+
+The full launch checklist (Supabase, email sender, Turnstile, DNS, Vercel settings) is in [docs/accounts-launch.md](docs/accounts-launch.md).
 
 Submitted thumbnails are uploaded to Vercel Blob, which reads the `BLOB_READ_WRITE_TOKEN` variable (set when a Blob store is linked to the Vercel project). The feedback API uses it too.
