@@ -2,7 +2,7 @@
 
 A free, public arcade of games built with AI. Every game listed here was made with AI tools and is free to play in the browser.
 
-It's a static site: Vite + vanilla TypeScript, no third-party fonts or CDNs; cookieless Vercel Web Analytics counts page views. First-party games come from one file, [`public/games.json`](public/games.json). Signed-in players can also submit their own games, which appear after review (see [Accounts and submissions](#accounts-and-submissions)). What the site stores is described on the [privacy page](privacy.html).
+It's a static site: Vite + vanilla TypeScript, no third-party fonts or CDNs. The one third-party script is Google Analytics 4 (gtag.js, which sets cookies); it and cookieless Vercel Web Analytics count page views and a few custom events (see [`src/analytics.ts`](src/analytics.ts)). First-party games come from one file, [`public/games.json`](public/games.json). Signed-in players can also submit their own games, which appear after review (see [Accounts and submissions](#accounts-and-submissions)). What the site stores is described on the [privacy page](privacy.html).
 
 - **Home (`/`)**: a grid of game cards. Each card links straight to the game's live URL (new tab).
 - **Play page (`/play.html?id=<game-id>`)**: gives the game the whole screen in an iframe, with a small control pill (back, full screen, open in new tab, Ko-fi tip, feedback) for when embedding doesn't work well. See [Play page sizing](#play-page-sizing).

@@ -1,4 +1,4 @@
-import './analytics';
+import { trackEvent, trackShares } from './analytics';
 import { attachFeedback } from './feedback';
 import { el, loadGames, type Game } from './games';
 
@@ -179,6 +179,26 @@ wake();
 /* ---------- Feedback (dialog lives inside the stage so it still shows in full screen) ---------- */
 attachFeedback(document.getElementById('feedback') as HTMLButtonElement, { mount: stage, currentGame: () => currentGame?.id });
 
+/* ---------- Analytics: play_clicked, game_session_ended, share_clicked ---------- */
+let playStart = 0;
+
+function startSession(game: Game): void {
+  playStart = performance.now();
+  trackEvent('play_clicked', { game_id: game.id, device: matchMedia('(pointer: coarse)').matches ? 'mobile' : 'desktop' });
+}
+
+window.addEventListener('pagehide', () => {
+  if (!currentGame || !playStart) return;
+  trackEvent('game_session_ended', { game_id: currentGame.id, seconds_played: Math.round((performance.now() - playStart) / 1000) });
+  playStart = 0;
+});
+// Back to this page from the back/forward cache: time the new visit from now.
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted && currentGame) playStart = performance.now();
+});
+
+trackShares(() => currentGame?.id);
+
 /* ---------- Load the game ---------- */
 function showMessage(heading: string, message: string): void {
   title.textContent = heading;
@@ -213,6 +233,7 @@ try {
       }),
     );
     measure();
+    startSession(game);
   }
 } catch (err) {
   console.error(err);

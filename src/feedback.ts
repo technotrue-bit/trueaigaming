@@ -1,3 +1,4 @@
+import { trackEvent } from './analytics';
 import { el, loadGames } from './games';
 
 const MAX_MESSAGE = 2000;
@@ -119,6 +120,8 @@ function build(mount: HTMLElement) {
     try {
       const res = await fetch('/api/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (res.ok) {
+        // Never the message or contact.
+        trackEvent('feedback_sent', { game_id: payload.game || 'general', rating: type });
         form.hidden = true;
         done.hidden = false;
         doneMsg.focus();
