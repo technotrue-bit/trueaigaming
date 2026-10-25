@@ -5,8 +5,8 @@ import { createTestStore } from './test-store.mjs';
 import { deleteAccount, ensureProfile, setHandle } from './profiles.mjs';
 
 /** A signed-in user as requireUser returns it. */
-function user(id, handle = '', displayName = '') {
-  return { id, email: `${id}@example.com`, verified: true, handle, displayName };
+function user(id, handle = '', displayName = '', ageConfirmed = true) {
+  return { id, email: `${id}@example.com`, verified: true, handle, displayName, ageConfirmed };
 }
 
 /** A fake rebuild that records each call and returns `result`. */
@@ -230,4 +230,30 @@ test('deleteAccount passes the rebuild result through unchanged, so the route ca
 
   assert.deepEqual(result, { ok: true, rebuild: { ok: false, error: 'Rebuild did not start' } });
   assert.equal(calls.length, 1);
+});
+
+test('ensureProfile creates nothing without the sign-up age check, and returns 403', async () => {
+  const store = createTestStore();
+  assert.deepEqual(await ensureProfile(store, user('user-1', 'ada', 'Ada', false)), {
+    ok: false,
+    status: 403,
+    error: 'Accounts are for people 13 and up',
+  });
+  assert.equal(store.state.profiles.has('user-1'), false);
+});
+
+test('ensureProfile still returns an existing profile when the age flag is missing', async () => {
+  const store = createTestStore({ profiles: [{ id: 'user-1', handle: 'ada', display_name: 'Ada' }] });
+  const result = await ensureProfile(store, user('user-1', 'ada', 'Ada', false));
+  assert.equal(result.ok, true);
+});
+
+test('setHandle creates no profile without the sign-up age check', async () => {
+  const store = createTestStore();
+  assert.deepEqual(await setHandle(store, user('user-1', '', '', false), 'ada'), {
+    ok: false,
+    status: 403,
+    error: 'Accounts are for people 13 and up',
+  });
+  assert.equal(store.state.profiles.has('user-1'), false);
 });

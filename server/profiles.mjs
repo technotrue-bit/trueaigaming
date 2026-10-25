@@ -25,6 +25,11 @@ function isUniqueViolation(err) {
   return typeof err === 'object' && err !== null && /** @type {{ code?: unknown }} */ (err).code === UNIQUE_VIOLATION;
 }
 
+/** @returns {{ ok: false, status: 403, error: string }} */
+function ageCheckMissing() {
+  return { ok: false, status: 403, error: 'Accounts are for people 13 and up' };
+}
+
 /** @returns {{ ok: false, status: 409, error: string }} */
 function chooseAHandle() {
   return { ok: false, status: 409, error: 'Choose a handle' };
@@ -40,6 +45,8 @@ function chooseAHandle() {
 export async function ensureProfile(store, user) {
   const existing = await store.getProfile(user.id);
   if (existing) return { ok: true, value: existing };
+  // No profile without the sign-up age check, so an account made around the form cannot submit games.
+  if (!user.ageConfirmed) return ageCheckMissing();
 
   const handle = validateHandle(user.handle);
   const displayName = validateDisplayName(user.displayName);
@@ -74,6 +81,7 @@ export async function setHandle(store, user, handle) {
     if (existing) {
       return { ok: true, value: await store.updateProfile(user.id, { handle: checked.value }) };
     }
+    if (!user.ageConfirmed) return ageCheckMissing();
     // The display name comes from metadata too, so it is validated. A value that fails becomes blank.
     const displayName = validateDisplayName(user.displayName);
     const value = await store.insertProfile({

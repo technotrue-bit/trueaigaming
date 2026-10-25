@@ -9,6 +9,7 @@
  * @property {boolean} verified
  * @property {string} handle
  * @property {string} displayName
+ * @property {boolean} ageConfirmed True only when the signup metadata says the person passed the age check.
  */
 
 /**
@@ -70,6 +71,8 @@ export async function readUser(req, { fetchImpl = fetch, url, anonKey }) {
     verified: typeof data.email_confirmed_at === 'string',
     handle: text(metadata.handle),
     displayName: text(metadata.display_name),
+    // Fails closed: only a literal true counts. The sign-up form sets it after the age check passes.
+    ageConfirmed: metadata.age_confirmed === true,
   };
 }
 

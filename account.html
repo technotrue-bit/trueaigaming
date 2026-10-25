@@ -58,7 +58,8 @@
         font-size: 0.9rem;
         font-weight: 700;
       }
-      .account input {
+      .account input,
+      .account select {
         width: 100%;
         padding: 0.55rem 0.7rem;
         border: 1px solid rgb(185 166 221 / 0.5);
@@ -67,6 +68,26 @@
         color: var(--text);
         font: inherit;
         font-size: 1rem; /* 16px+ stops iOS zooming on focus */
+      }
+      .account-birth {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.6rem;
+        margin: 0;
+        padding: 0;
+        border: 0;
+      }
+      .account-birth legend {
+        margin-bottom: 0.35rem;
+        padding: 0;
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+      .account-birth .account-label {
+        font-weight: 400;
+      }
+      .account-captcha:empty {
+        display: none;
       }
       .account-actions {
         display: flex;
@@ -98,6 +119,10 @@
         background: none;
         font: inherit;
       }
+      .account-hint {
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
       .account-status {
         min-height: 1.5em;
         font-size: 0.9rem;
@@ -122,7 +147,33 @@
 
       <section id="signed-out" class="account-panel" aria-labelledby="signup-title" hidden>
         <h2 id="signup-title">Create account</h2>
+        <p id="signup-closed" hidden>Sorry, you can't create an account. You can still play every game on the site, no account needed.</p>
         <form id="signup-form" class="account-form">
+          <fieldset class="account-birth">
+            <legend>Date of birth</legend>
+            <label class="account-label">
+              Month
+              <select name="birth_month" required>
+                <option value="">Month</option>
+                <option value="1">January</option>
+                <option value="2">February</option>
+                <option value="3">March</option>
+                <option value="4">April</option>
+                <option value="5">May</option>
+                <option value="6">June</option>
+                <option value="7">July</option>
+                <option value="8">August</option>
+                <option value="9">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+              </select>
+            </label>
+            <label class="account-label">
+              Year
+              <input name="birth_year" type="text" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="off" placeholder="YYYY" />
+            </label>
+          </fieldset>
           <label class="account-label">
             Email
             <input name="email" type="email" required autocomplete="email" maxlength="254" />
@@ -139,6 +190,8 @@
             Display name (optional)
             <input name="display_name" type="text" maxlength="40" autocomplete="nickname" />
           </label>
+          <p class="account-hint">We don't keep your date of birth.</p>
+          <div id="signup-captcha" class="account-captcha"></div>
           <button id="signup-submit" class="btn btn-primary" type="submit">Create account</button>
           <p id="signup-status" class="account-status" role="status"></p>
         </form>
@@ -153,6 +206,7 @@
             Password
             <input name="password" type="password" required autocomplete="current-password" />
           </label>
+          <div id="signin-captcha" class="account-captcha"></div>
           <button id="signin-submit" class="btn btn-primary" type="submit">Sign in</button>
           <p id="signin-status" class="account-status" role="status"></p>
         </form>
@@ -162,6 +216,7 @@
       <section id="unverified" class="account-panel" aria-labelledby="verify-title" hidden>
         <h2 id="verify-title">Verify your email</h2>
         <p>Verify your email to submit games.</p>
+        <div id="resend-captcha" class="account-captcha"></div>
         <div class="account-actions">
           <button id="resend" class="btn btn-primary" type="button">Resend</button>
           <button id="unverified-sign-out" class="btn btn-ghost" type="button">Sign out</button>

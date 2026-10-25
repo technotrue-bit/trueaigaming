@@ -1,8 +1,10 @@
-// Shared submission rules: handles, display names, passwords, slugs, links, players and whole submissions. Run with `npm test`.
+// Shared submission rules: handles, display names, passwords, the sign-up age check, slugs, links, players and whole submissions. Run with `npm test`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  MIN_ACCOUNT_AGE,
   RESERVED_HANDLES,
+  checkSignupAge,
   isBlobThumbnailUrl,
   slugFromName,
   validateDisplayName,
@@ -318,4 +320,29 @@ test('validateSubmission takes the store host and refuses a thumbnail from anoth
   assert.deepEqual(validateSubmission(other, { blobHost: host }), { ok: false, error: 'Thumbnail must be hosted on Vercel Blob' });
   assert.equal(validateSubmission(other).ok, true);
   assert.equal(validateSubmission(withFields({ thumbnailUrl: null }), { blobHost: host }).ok, true);
+});
+
+// ---------- Sign-up age ----------
+
+const OCT_25_2026 = new Date(2026, 9, 25);
+
+test('checkSignupAge allows 13 and up, and needs the birthday month to have passed', () => {
+  assert.equal(MIN_ACCOUNT_AGE, 13);
+  assert.deepEqual(checkSignupAge(9, 2013, OCT_25_2026), { ok: true, value: 'allowed' });
+  assert.deepEqual(checkSignupAge('9', '2013', OCT_25_2026), { ok: true, value: 'allowed' });
+  assert.deepEqual(checkSignupAge(1, 1990, OCT_25_2026), { ok: true, value: 'allowed' });
+  // Born October 2013: might turn 13 later this month, so not yet.
+  assert.deepEqual(checkSignupAge(10, 2013, OCT_25_2026), { ok: true, value: 'too-young' });
+  assert.deepEqual(checkSignupAge(11, 2013, OCT_25_2026), { ok: true, value: 'too-young' });
+  assert.deepEqual(checkSignupAge(1, 2015, OCT_25_2026), { ok: true, value: 'too-young' });
+});
+
+test('checkSignupAge rejects missing, malformed and future dates', () => {
+  for (const [month, year] of [['', '2000'], [0, 2000], [13, 2000], [1.5, 2000], ['x', 2000]]) {
+    assert.deepEqual(checkSignupAge(month, year, OCT_25_2026), { ok: false, error: 'Choose your birth month' });
+  }
+  for (const year of ['', 1800, 2027, 2000.5, 'abc']) {
+    assert.deepEqual(checkSignupAge(5, year, OCT_25_2026), { ok: false, error: 'Enter your birth year' });
+  }
+  assert.equal(checkSignupAge(12, 2026, OCT_25_2026).ok, false);
 });
