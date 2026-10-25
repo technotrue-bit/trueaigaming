@@ -16,7 +16,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   const url = process.env.SUPABASE_URL ?? '';
   const anonKey = process.env.SUPABASE_ANON_KEY ?? '';
-  if (!url || !anonKey) return send(res, 500, { ok: false, error: 'Server is not set up' });
+  // Thumbnails need a public Blob store. The store behind BLOB_READ_WRITE_TOKEN is private (feedback), so this one is separate.
+  const blobToken = process.env.THUMBNAIL_BLOB_READ_WRITE_TOKEN ?? '';
+  if (!url || !anonKey || !blobToken) return send(res, 500, { ok: false, error: 'Server is not set up' });
 
   try {
     const auth = await requireVerified(req, { url, anonKey });
@@ -36,6 +38,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     // The owner's id stays out of the public path. addRandomSuffix keeps each upload's address unique.
     const blob = await put(`thumbnails/thumbnail.${checked.value.extension}`, bytes, {
       access: 'public',
+      token: blobToken,
       addRandomSuffix: true,
       contentType: CONTENT_TYPES[checked.value.extension],
     });
