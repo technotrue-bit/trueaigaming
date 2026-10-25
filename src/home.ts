@@ -1,4 +1,4 @@
-import './analytics';
+import { trackEvent } from './analytics';
 import { attachFeedback } from './feedback';
 import { el, loadGames, statusClass, type Game } from './games';
 
@@ -56,7 +56,7 @@ function card(game: Game, index: number): HTMLLIElement {
 
   return el(
     'li',
-    { class: 'card' },
+    { class: 'card', 'data-game': game.id },
     cover,
     el('div', { class: 'card-body' }, head, el('p', { class: 'card-desc' }, game.description), ...(facts ? [facts] : []), ...(how ? [how] : []), actions),
   );
@@ -83,6 +83,13 @@ grid.addEventListener('click', (event) => {
   button.setAttribute('aria-expanded', String(open));
   const panel = document.getElementById(button.getAttribute('aria-controls') ?? '');
   if (panel) panel.hidden = !open;
+});
+
+// game_card_clicked for any link on a game card, prerendered or client-rendered. position is the card's 0-based index.
+grid.addEventListener('click', (event) => {
+  const card = (event.target as Element).closest('a')?.closest<HTMLLIElement>('li.card[data-game]');
+  if (!card) return;
+  trackEvent('game_card_clicked', { game_id: card.dataset.game!, position: [...grid.children].indexOf(card) });
 });
 
 try {

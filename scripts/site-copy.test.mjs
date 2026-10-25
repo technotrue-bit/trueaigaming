@@ -12,12 +12,16 @@ const footer = (/** @type {string} */ html) => html.match(/<footer class="footer
 const SUPABASE_ORIGIN = 'https://ycajnupfbiushygycclf.supabase.co';
 const BLOB_HOST = 'https://*.public.blob.vercel-storage.com';
 const FRAME_SRC = 'https://super-star-party.vercel.app https://*.vercel.app';
+// Google Analytics 4 (gtag.js): the loader, its inline config snippet, and where it sends hits.
+const GTM = 'https://www.googletagmanager.com';
+const GA_CONNECT = `https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com ${GTM}`;
+const GA_IMG = `https://www.google-analytics.com ${GTM}`;
 const EXPECTED_CSP = [
   "default-src 'self'",
-  `connect-src 'self' ${SUPABASE_ORIGIN}`,
-  `img-src 'self' data: ${BLOB_HOST}`,
+  `connect-src 'self' ${SUPABASE_ORIGIN} ${GA_CONNECT}`,
+  `img-src 'self' data: ${BLOB_HOST} ${GA_IMG}`,
   "style-src 'self' 'unsafe-inline'",
-  "script-src 'self'",
+  `script-src 'self' 'unsafe-inline' ${GTM}`,
   `frame-src ${FRAME_SRC}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",

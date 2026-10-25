@@ -270,6 +270,16 @@ const ORGANIZATION = {
   sameAs: ['https://x.com/ItsMeTrueG'],
 };
 
+/** GA4 (TrueAIGaming, G-CK2EZQ8PQE). Same snippet as the <head> of index.html and play.html. */
+export const GTAG_HTML = `<!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-CK2EZQ8PQE"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-CK2EZQ8PQE');
+    </script>`;
+
 // ---------- Home page ----------
 
 /** Where Play goes: /play.html for hosted games, the game's own site in a new tab for external ones. @param {Game} g */
@@ -290,7 +300,7 @@ export function cardHtml(g, index) {
     ? `<button class="card-info" type="button" aria-expanded="false" aria-controls="how-${id}" aria-label="How ${esc(g.name)} was made"><span aria-hidden="true">i</span></button>`
     : '';
   const how = g.howItWasMade ? `<div class="card-how" id="how-${id}" hidden><p>${esc(g.howItWasMade)}</p></div>` : '';
-  return `<li class="card">
+  return `<li class="card" data-game="${id}">
           <a class="card-cover" ${playAttrs(g)} aria-label="${coverLabel(g)}">
             ${thumbHtml(g, `alt="${esc(g.name)} screenshot" width="1280" height="720" decoding="async" loading="${index < 2 ? 'eager' : 'lazy'}"`)}<span class="${statusClass(g.status)}">${esc(g.status)}</span>
           </a>
@@ -389,6 +399,7 @@ export function gamePageHtml(g) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    ${GTAG_HTML}
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#0b0221" />
     ${metaTags({
