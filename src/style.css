@@ -390,6 +390,10 @@ a {
   color: var(--muted);
   font-size: 0.9rem;
 }
+.footer .legal {
+  margin-top: 1.5rem;
+  font-size: 0.8rem;
+}
 /* Ko-fi tip link: deliberately quieter than every card/game button. */
 .tip {
   display: flex;
