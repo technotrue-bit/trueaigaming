@@ -30,5 +30,20 @@
     "minHeight": 520,
     "minWidthLandscape": 560,
     "minHeightLandscape": 280
+  },
+  {
+    "id": "squishy-closet",
+    "name": "Squishy Closet!",
+    "description": "Squish, pet and collect cute bao squishies",
+    "longDescription": "Squishy Closet! is a free squishy toy game for kids that runs right in your browser. Squish, pet, tickle, toss and hug soft bao buns, open surprise boxes and collect them all. Built with AI, with nothing to install.",
+    "about": "Squishy Closet! is a free game for kids aged 4 and up, made for phones held upright, with nothing to install. Your squishy squashes right where your fingers press, and some are firm and bouncy while others are super soft and slow to rise. Open your first squishy from its steamer box, then learn to squish, pet, tickle, toss and hug it. Every bit of love you give fills a heart that earns another surprise box. There are 66 squishies to find, 30 Bao Buns and 36 Spooky ones like Pumpkin Bao, Boo Bun and Batty Mochi, in matte, shiny, glitter, glow and gold. Give each one its own name, line them up on your closet shelf and fill your Squishy Book. No ads, no chat and no accounts; everything stays on your device.",
+    "howItWasMade": "Built with AI coding agents one phase at a time. The soft squishy bodies, faces, sounds and Squishy Island are all generated in code with three.js and Web Audio, with no art files.",
+    "minPlayers": 1,
+    "maxPlayers": 1,
+    "playUrl": "https://squishy-closet.vercel.app",
+    "thumbnail": "/thumbs/squishy-closet.png",
+    "status": "beta",
+    "repo": "https://github.com/technotrue-bit/Squishy-closet",
+    "thumbnailWebp": "/thumbs/squishy-closet.webp"
   }
 ]
