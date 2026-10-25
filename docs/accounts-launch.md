@@ -44,8 +44,10 @@ every sign-up and sign-in fails.
 ## 4. Vercel deploy hook and Blob host
 
 1. **Vercel → trueaigaming → Settings → Git → Deploy Hooks:** create one for branch `main`. Its URL is `DEPLOY_HOOK_URL`.
-2. **Vercel → Storage → the Blob store linked to the project:** copy the host part of a file URL
-   (`<id>.public.blob.vercel-storage.com`). That is `BLOB_PUBLIC_HOST`.
+2. **Vercel → Storage → Create → Blob**, access **Public**, named for example `trueaigaming-thumbnails`. Connect it
+   to the trueaigaming project with the environment variable prefix `THUMBNAIL_BLOB`, so its token lands in
+   `THUMBNAIL_BLOB_READ_WRITE_TOKEN` and the private feedback store's `BLOB_READ_WRITE_TOKEN` is left alone.
+3. Copy the host part of that store's URL (`<id>.public.blob.vercel-storage.com`). That is `BLOB_PUBLIC_HOST`.
 
 ## 5. Vercel environment variables
 

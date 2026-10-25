@@ -134,4 +134,4 @@ Only the `VITE_` variables reach the browser (Vite inlines them at build time). 
 
 The full launch checklist (Supabase, email sender, Turnstile, DNS, Vercel settings) is in [docs/accounts-launch.md](docs/accounts-launch.md).
 
-Submitted thumbnails are uploaded to Vercel Blob, which reads the `BLOB_READ_WRITE_TOKEN` variable (set when a Blob store is linked to the Vercel project). The feedback API uses it too.
+Submitted thumbnails go to their own **public** Vercel Blob store, through `THUMBNAIL_BLOB_READ_WRITE_TOKEN` (connect the store to the project with the env var prefix `THUMBNAIL_BLOB`). The feedback API uses the separate private store behind `BLOB_READ_WRITE_TOKEN`; a public upload to that store would fail. `BLOB_PUBLIC_HOST` is the thumbnail store's host.
