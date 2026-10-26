@@ -208,6 +208,31 @@ test('home.ts and seo.mjs use the same external cover label suffix', () => {
   assert.ok(readFileSync(join(ROOT, 'scripts/seo.mjs'), 'utf8').includes(suffix));
 });
 
+test('loadGames keeps cloudSave and moveCode, only when true and the game is not external', (t) => {
+  const thumbnail = '/thumbs/flag-catch.png';
+  const games = loadGames(
+    gamesFile(t, [
+      { ...entry, id: 'saves', thumbnail, cloudSave: true, moveCode: true },
+      { ...entry, id: 'strings', thumbnail, cloudSave: 'true', moveCode: 1 },
+      { ...entry, id: 'ext', thumbnail, external: true, cloudSave: true, moveCode: true },
+    ]),
+  );
+  assert.deepEqual(
+    games.map((g) => [g.id, g.cloudSave, g.moveCode]),
+    [
+      ['saves', true, true],
+      ['strings', undefined, undefined],
+      ['ext', undefined, undefined],
+    ],
+  );
+});
+
+test('the real games.json keeps account saves on Flag Catch and the move code on Aurora\'s World', () => {
+  const games = loadGames();
+  assert.equal(games.find((g) => g.id === 'flag-catch')?.cloudSave, true);
+  assert.equal(games.find((g) => g.id === 'squishy-closet')?.moveCode, true);
+});
+
 test('loadGames keeps the four play-page min sizes, rounded to whole pixels', (t) => {
   const warn = t.mock.method(console, 'warn', () => {});
   const [game] = loadGames(
