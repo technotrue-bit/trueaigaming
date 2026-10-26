@@ -3,6 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <script>
+      // A "Move to a new phone" link carries a game save in its #fragment. Take it off the address before any
+      // analytics runs, so it is never recorded; play.ts hands it to the game's frame.
+      if (location.hash.indexOf('#move=') === 0) {
+        window.__tagMove = location.hash;
+        history.replaceState(null, '', location.pathname + location.search);
+      }
+    </script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-CK2EZQ8PQE"></script>
     <script>

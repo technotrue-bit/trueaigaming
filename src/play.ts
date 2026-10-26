@@ -1,5 +1,6 @@
 import { trackEvent, trackShares } from './analytics';
 import { attachFeedback } from './feedback';
+import { startCloudSaves } from './cloud-saves';
 import { el, loadGames, type Game } from './games';
 
 /** Safari (incl. older iPadOS) only ships the prefixed Fullscreen API. */
@@ -222,16 +223,21 @@ try {
     newTab.href = game.playUrl;
     newTab.hidden = false;
     fullscreenBtn.hidden = !canFullscreen;
-    frameWrap.replaceChildren(
-      el('iframe', {
-        class: 'game-frame',
-        src: game.playUrl,
-        title: game.name,
-        allow: 'fullscreen; autoplay; gamepad; clipboard-write; accelerometer; gyroscope; screen-wake-lock; web-share; xr-spatial-tracking',
-        allowfullscreen: '',
-        referrerpolicy: 'strict-origin-when-cross-origin',
-      }),
-    );
+    // A move link's save (taken off this page's address in play.html) goes only to the game that reads it, inside
+    // the frame's #fragment, which is never sent to a server.
+    const move = (window as { __tagMove?: unknown }).__tagMove;
+    const moveHash = game.moveCode && typeof move === 'string' && /^#move=[A-Za-z0-9_-]+$/.test(move) ? move : '';
+    const frame = el('iframe', {
+      class: 'game-frame',
+      src: game.playUrl.split('#')[0] + moveHash,
+      title: game.name,
+      allow: 'fullscreen; autoplay; gamepad; clipboard-write; accelerometer; gyroscope; screen-wake-lock; web-share; xr-spatial-tracking',
+      allowfullscreen: '',
+      referrerpolicy: 'strict-origin-when-cross-origin',
+    });
+    // Listen before the game loads, so its first message is heard.
+    startCloudSaves(game, frame);
+    frameWrap.replaceChildren(frame);
     measure();
     startSession(game);
   }
