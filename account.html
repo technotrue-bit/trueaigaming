@@ -134,6 +134,107 @@
       .account-back {
         margin: 0;
       }
+      /* Sign in and create account share one card, switched by the tabs at its top. */
+      .auth-card {
+        gap: 1.1rem;
+        padding: 1rem 1.25rem 1.25rem;
+        box-shadow:
+          0 0 0 1px rgb(255 43 214 / 0.15),
+          0 12px 40px rgb(0 0 0 / 0.45);
+      }
+      .auth-tabs {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.25rem;
+        padding: 0.25rem;
+        border: 1px solid rgb(185 166 221 / 0.35);
+        border-radius: 999px;
+        background: rgb(11 2 33 / 0.7);
+      }
+      .auth-tab {
+        min-height: 40px;
+        padding: 0.45rem 0.75rem;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--muted);
+        font: inherit;
+        font-size: 0.95rem;
+        font-weight: 800;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+      }
+      .auth-tab:hover {
+        color: var(--text);
+      }
+      .auth-tab[aria-selected='true'] {
+        color: var(--bg);
+        background: linear-gradient(135deg, var(--yellow), var(--pink));
+        box-shadow: 0 0 12px rgb(255 43 214 / 0.45);
+      }
+      .auth-tab:focus-visible {
+        outline: 2px solid var(--cyan);
+        outline-offset: 2px;
+      }
+      .auth-pane {
+        display: grid;
+        gap: 1rem;
+      }
+      .auth-card .account-form {
+        gap: 0.8rem;
+      }
+      .auth-lead {
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+      .auth-pair {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.6rem;
+      }
+      @media (max-width: 22rem) {
+        .auth-pair {
+          grid-template-columns: 1fr;
+        }
+      }
+      .auth-optional {
+        font-weight: 400;
+        color: var(--muted);
+      }
+      .account-label .account-hint {
+        font-weight: 400;
+      }
+      .auth-hint-tight {
+        margin-top: -0.4rem !important;
+      }
+      .auth-forgot {
+        margin: -0.35rem 0 0 !important;
+        text-align: right;
+      }
+      .auth-link {
+        padding: 0.25rem 0;
+        border: 0;
+        background: none;
+        color: var(--cyan);
+        font: inherit;
+        font-size: 0.9rem;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .auth-link:hover {
+        text-decoration: underline;
+      }
+      .auth-submit {
+        width: 100%;
+        margin-top: 0.25rem;
+      }
+      .auth-switch {
+        padding-top: 0.9rem;
+        border-top: 1px solid rgb(185 166 221 / 0.2);
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
     </style>
   </head>
   <body>
@@ -145,72 +246,87 @@
       <p id="notice" class="account-notice" role="status" aria-live="polite" hidden></p>
       <button id="retry" class="btn btn-ghost" type="button" hidden>Try again</button>
 
-      <section id="signed-out" class="account-panel" aria-labelledby="signup-title" hidden>
-        <h2 id="signup-title">Create account</h2>
-        <p id="signup-closed" hidden>Sorry, you can't create an account. You can still play every game on the site, no account needed.</p>
-        <form id="signup-form" class="account-form">
-          <fieldset class="account-birth">
-            <legend>Date of birth</legend>
-            <label class="account-label">
-              Month
-              <select name="birth_month" required>
-                <option value="">Month</option>
-                <option value="1">January</option>
-                <option value="2">February</option>
-                <option value="3">March</option>
-                <option value="4">April</option>
-                <option value="5">May</option>
-                <option value="6">June</option>
-                <option value="7">July</option>
-                <option value="8">August</option>
-                <option value="9">September</option>
-                <option value="10">October</option>
-                <option value="11">November</option>
-                <option value="12">December</option>
-              </select>
-            </label>
-            <label class="account-label">
-              Year
-              <input name="birth_year" type="text" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="off" placeholder="YYYY" />
-            </label>
-          </fieldset>
-          <label class="account-label">
-            Email
-            <input name="email" type="email" required autocomplete="email" maxlength="254" />
-          </label>
-          <label class="account-label">
-            Password (at least 12 characters)
-            <input name="password" type="password" required autocomplete="new-password" />
-          </label>
-          <label class="account-label">
-            Handle (3 to 24 characters)
-            <input name="handle" type="text" required minlength="3" maxlength="24" autocomplete="off" />
-          </label>
-          <label class="account-label">
-            Display name (optional)
-            <input name="display_name" type="text" maxlength="40" autocomplete="nickname" />
-          </label>
-          <p class="account-hint">We don't keep your date of birth.</p>
-          <div id="signup-captcha" class="account-captcha"></div>
-          <button id="signup-submit" class="btn btn-primary" type="submit">Create account</button>
-          <p id="signup-status" class="account-status" role="status"></p>
-        </form>
+      <section id="signed-out" class="account-panel auth-card" aria-label="Sign in or create an account" hidden>
+        <div class="auth-tabs" role="tablist" aria-label="Sign in or create an account">
+          <button id="tab-signin" class="auth-tab" type="button" role="tab" aria-selected="true" aria-controls="signin-pane">Sign in</button>
+          <button id="tab-signup" class="auth-tab" type="button" role="tab" aria-selected="false" aria-controls="signup-pane" tabindex="-1">Create account</button>
+        </div>
 
-        <h2 class="account-subhead">Sign in</h2>
-        <form id="signin-form" class="account-form">
-          <label class="account-label">
-            Email
-            <input name="email" type="email" required autocomplete="email" maxlength="254" />
-          </label>
-          <label class="account-label">
-            Password
-            <input name="password" type="password" required autocomplete="current-password" />
-          </label>
-          <div id="signin-captcha" class="account-captcha"></div>
-          <button id="signin-submit" class="btn btn-primary" type="submit">Sign in</button>
-          <p id="signin-status" class="account-status" role="status"></p>
-        </form>
-        <p><button id="forgot" class="btn btn-link" type="button">Forgot password?</button></p>
+        <div id="signin-pane" class="auth-pane" role="tabpanel" aria-labelledby="tab-signin">
+          <p class="auth-lead">Welcome back. Sign in to share and manage your games.</p>
+          <form id="signin-form" class="account-form">
+            <label class="account-label">
+              Email
+              <input name="email" type="email" required autocomplete="email" maxlength="254" />
+            </label>
+            <label class="account-label">
+              Password
+              <input name="password" type="password" required autocomplete="current-password" />
+            </label>
+            <p class="auth-forgot"><button id="forgot" class="auth-link" type="button">Forgot password?</button></p>
+            <div id="signin-captcha" class="account-captcha"></div>
+            <button id="signin-submit" class="btn btn-primary auth-submit" type="submit">Sign in</button>
+            <p id="signin-status" class="account-status" role="status"></p>
+          </form>
+          <p class="auth-switch">New here? <button class="auth-link" type="button" data-tab="signup">Create an account</button></p>
+        </div>
+
+        <div id="signup-pane" class="auth-pane" role="tabpanel" aria-labelledby="tab-signup" hidden>
+          <p class="auth-lead">Make an account to share your own games. Playing never needs one.</p>
+          <p id="signup-closed" hidden>Sorry, you can't create an account. You can still play every game on the site, no account needed.</p>
+          <form id="signup-form" class="account-form">
+            <fieldset class="account-birth">
+              <legend>Date of birth</legend>
+              <label class="account-label">
+                <span class="visually-hidden">Birth month</span>
+                <select name="birth_month" required>
+                  <option value="">Month</option>
+                  <option value="1">January</option>
+                  <option value="2">February</option>
+                  <option value="3">March</option>
+                  <option value="4">April</option>
+                  <option value="5">May</option>
+                  <option value="6">June</option>
+                  <option value="7">July</option>
+                  <option value="8">August</option>
+                  <option value="9">September</option>
+                  <option value="10">October</option>
+                  <option value="11">November</option>
+                  <option value="12">December</option>
+                </select>
+              </label>
+              <label class="account-label">
+                <span class="visually-hidden">Birth year</span>
+                <input name="birth_year" type="text" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="off" placeholder="Year" />
+              </label>
+            </fieldset>
+            <p class="account-hint auth-hint-tight">We don't keep your date of birth.</p>
+            <label class="account-label">
+              Email
+              <input name="email" type="email" required autocomplete="email" maxlength="254" />
+            </label>
+            <label class="account-label">
+              Password
+              <input name="password" type="password" required autocomplete="new-password" aria-describedby="signup-password-hint" />
+              <span id="signup-password-hint" class="account-hint">At least 12 characters.</span>
+            </label>
+            <div class="auth-pair">
+              <label class="account-label">
+                Handle
+                <input name="handle" type="text" required minlength="3" maxlength="24" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="signup-handle-hint" />
+              </label>
+              <label class="account-label">
+                <span>Display name <span class="auth-optional">(optional)</span></span>
+                <input name="display_name" type="text" maxlength="40" autocomplete="nickname" />
+              </label>
+            </div>
+            <p id="signup-handle-hint" class="account-hint auth-hint-tight">Your handle is your public name on the site: 3 to 24 letters, numbers or hyphens.</p>
+            <div id="signup-captcha" class="account-captcha"></div>
+            <button id="signup-submit" class="btn btn-primary auth-submit" type="submit">Create account</button>
+            <p id="signup-status" class="account-status" role="status"></p>
+          </form>
+          <p class="auth-switch">Already have an account? <button class="auth-link" type="button" data-tab="signin">Sign in</button></p>
+        </div>
       </section>
 
       <section id="unverified" class="account-panel" aria-labelledby="verify-title" hidden>
