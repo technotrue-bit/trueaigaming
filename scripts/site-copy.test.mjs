@@ -152,3 +152,21 @@ test('privacy and terms say accounts are for 13 and up', () => {
   assert.ok(read('terms.html').includes('accounts are for people 13 and up'));
   assert.match(read('terms.html'), /<h2>Games you share<\/h2>/);
 });
+
+test('the home page has a hidden Sign in pill that links to the account page', () => {
+  const html = read('index.html');
+  assert.match(html, /<a id="account-pill" class="account-pill" href="\/account" hidden>/);
+  assert.match(html, /<span id="account-pill-label">Sign in<\/span>/);
+  assert.ok(read('src/home.ts').includes("import './account-pill';"));
+});
+
+test('sign in and create account share one card with two tabs', () => {
+  const html = read('account.html');
+  const card = html.match(/<section id="signed-out"[\s\S]*?<\/section>/)?.[0] ?? '';
+  assert.match(card, /role="tablist"/);
+  assert.match(card, /id="tab-signin"[^>]*aria-selected="true"/);
+  assert.match(card, /id="tab-signup"[^>]*aria-selected="false"/);
+  assert.match(card, /<div id="signin-pane"[^>]*role="tabpanel"/);
+  assert.match(card, /<div id="signup-pane"[^>]*role="tabpanel"[^>]*hidden>/);
+  assert.ok(card.includes('id="signin-form"') && card.includes('id="signup-form"') && card.includes('id="forgot"'));
+});

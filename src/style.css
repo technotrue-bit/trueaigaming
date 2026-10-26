@@ -88,8 +88,51 @@ a {
 
 /* ---------- Hero ---------- */
 .hero {
+  position: relative;
   text-align: center;
   padding: clamp(2.5rem, 10vw, 6rem) 1rem clamp(1.5rem, 5vw, 3rem);
+}
+
+/* Home page Sign in / My account pill, top right of the hero. Shown by src/account-pill.ts when accounts are on. */
+.account-pill {
+  position: absolute;
+  top: max(0.85rem, env(safe-area-inset-top));
+  right: max(0.85rem, env(safe-area-inset-right));
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  padding: 0.4rem 0.95rem 0.4rem 0.75rem;
+  border: 2px solid var(--cyan);
+  border-radius: 999px;
+  background: rgb(11 2 33 / 0.8);
+  color: var(--text);
+  font-weight: 800;
+  font-size: 0.9rem;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow:
+    0 0 12px rgb(41 243 255 / 0.45),
+    inset 0 0 10px rgb(41 243 255 / 0.2);
+  transition: box-shadow 0.15s, background 0.15s;
+}
+.account-pill:hover,
+.account-pill:focus-visible {
+  background: rgb(41 243 255 / 0.15);
+  box-shadow:
+    0 0 20px rgb(41 243 255 / 0.75),
+    inset 0 0 10px rgb(41 243 255 / 0.3);
+}
+.account-pill-icon {
+  color: var(--cyan);
+  flex: none;
+}
+.account-pill[hidden] {
+  display: none;
+}
+/* Room above the logo for the pill, so they never overlap on a phone. */
+.hero:has(.account-pill:not([hidden])) {
+  padding-top: max(4.5rem, clamp(2.5rem, 10vw, 6rem));
 }
 
 .logo {

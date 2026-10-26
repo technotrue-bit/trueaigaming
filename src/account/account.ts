@@ -12,6 +12,9 @@ const DELETE_CONFIRM = "Delete your account and all your games? This can't be un
 const AGE_BLOCK_KEY = 'tag-signup-closed';
 
 type Screen = 'signed-out' | 'unverified' | 'verified' | 'handle-setup' | 'new-password';
+/** The two tabs of the signed-out card. */
+type AuthTab = 'signin' | 'signup';
+const AUTH_TABS: AuthTab[] = ['signin', 'signup'];
 const SCREENS: Screen[] = ['signed-out', 'unverified', 'verified', 'handle-setup', 'new-password'];
 
 /** The profile routes reply with { ok: true, profile } for GET and POST. */
@@ -25,6 +28,9 @@ let pendingEmail = '';
 
 /** True from a password-reset link until a new password is saved. While it is set, only the new-password screen shows. */
 let recovering = false;
+
+/** The open tab of the signed-out card. A link to /account#create opens on Create account. */
+let authTab: AuthTab = location.hash === '#create' ? 'signup' : 'signin';
 
 const byId = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -84,10 +90,8 @@ function showScreen(screen: Screen | null): void {
   if (recovering && screen !== 'new-password') return;
   for (const id of SCREENS) byId<HTMLElement>(id).hidden = id !== screen;
   for (const el of Object.values(statusEls)) setStatus(el, '');
-  if (screen === 'signed-out') {
-    captcha.signup.start();
-    captcha.signin.start();
-  }
+  // Only the open tab's bot check renders, since Turnstile does not render into a hidden box.
+  if (screen === 'signed-out') captcha[authTab].start();
   if (screen === 'unverified') captcha.resend.start();
 }
 
@@ -151,6 +155,20 @@ async function attempt(control: HTMLButtonElement, out: HTMLElement, task: () =>
   }
 }
 
+/** Opens one tab of the signed-out card. `focus` moves focus to the tab, for keyboard use. */
+function showTab(tab: AuthTab, focus = false): void {
+  authTab = tab;
+  for (const name of AUTH_TABS) {
+    const button = byId<HTMLButtonElement>(`tab-${name}`);
+    const open = name === tab;
+    button.setAttribute('aria-selected', String(open));
+    button.tabIndex = open ? 0 : -1;
+    byId<HTMLElement>(`${name}-pane`).hidden = !open;
+  }
+  if (focus) byId<HTMLButtonElement>(`tab-${tab}`).focus();
+  if (!byId<HTMLElement>('signed-out').hidden) captcha[tab].start();
+}
+
 function showUnverified(email: string): void {
   pendingEmail = email;
   showScreen('unverified');
@@ -209,6 +227,22 @@ function wire(): void {
   if (ageBlocked()) {
     signupForm.hidden = true;
     signupClosed.hidden = false;
+  }
+
+  showTab(authTab);
+  for (const name of AUTH_TABS) {
+    const button = byId<HTMLButtonElement>(`tab-${name}`);
+    button.addEventListener('click', () => showTab(name));
+    // Arrow keys move between the two tabs, as in any tab list.
+    button.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      event.preventDefault();
+      showTab(name === 'signin' ? 'signup' : 'signin', true);
+    });
+  }
+  for (const link of document.querySelectorAll<HTMLButtonElement>('button[data-tab]')) {
+    const tab = link.dataset.tab;
+    if (tab === 'signin' || tab === 'signup') link.addEventListener('click', () => showTab(tab, true));
   }
 
   // Registered before the first route(), so a password-reset event during session setup is not missed.
