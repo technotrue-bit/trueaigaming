@@ -26,6 +26,7 @@
     "thumbnail": "/thumbs/flag-catch.png",
     "status": "live",
     "repo": "https://github.com/technotrue-bit/Flag-Catch",
+    "cloudSave": true,
     "minWidth": 340,
     "minHeight": 520,
     "minWidthLandscape": 560,
@@ -44,6 +45,7 @@
     "thumbnail": "/thumbs/squishy-closet.png",
     "status": "beta",
     "repo": "https://github.com/technotrue-bit/Squishy-closet",
+    "moveCode": true,
     "thumbnailWebp": "/thumbs/squishy-closet.webp"
   }
 ]

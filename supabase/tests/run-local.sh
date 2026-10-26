@@ -10,7 +10,8 @@
 # Environment (all optional):
 #   PG_BIN_DIR   directory holding initdb, pg_ctl and psql (default: the newest /usr/lib/postgresql/N/bin)
 #   TMPDIR       where the temporary directory is made (default: /tmp)
-#   MIGRATION    migration file to test (default: supabase/migrations/0001_accounts_submissions.sql)
+#   MIGRATION    first migration file to test (default: supabase/migrations/0001_accounts_submissions.sql). Every later
+#                migration in the same folder is applied after it, in name order.
 set -u -o pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -74,6 +75,12 @@ load() { "$PSQL" -X -q -v ON_ERROR_STOP=1 -f "$1" >/dev/null || { echo "run-loca
 load "$HERE/supabase-shim.sql"
 load "$MIGRATION"
 echo "migration applied: $(basename "$MIGRATION")"
+for LATER in "$(dirname "$MIGRATION")"/*.sql; do
+  if [[ "$(basename "$LATER")" > "$(basename "$MIGRATION")" ]]; then
+    load "$LATER"
+    echo "migration applied: $(basename "$LATER")"
+  fi
+done
 
 # Row-level security and constraint checks. The last line of output must be "rls ok".
 RESULT="$("$PSQL" -X -q -tA -v ON_ERROR_STOP=1 -f "$HERE/rls-check.sql" 2>&1)"
@@ -81,6 +88,15 @@ STATUS=$?
 echo "$RESULT" | tail -n 5
 if [ "$STATUS" != 0 ] || [ "$(echo "$RESULT" | tail -n 1)" != "rls ok" ]; then
   echo "run-local.sh: the checks FAILED" >&2
+  exit 1
+fi
+
+# Game saves: row-level security, grants and limits. The last line of output must be "game saves ok".
+RESULT="$("$PSQL" -X -q -tA -v ON_ERROR_STOP=1 -f "$HERE/game-saves-check.sql" 2>&1)"
+STATUS=$?
+echo "$RESULT" | tail -n 5
+if [ "$STATUS" != 0 ] || [ "$(echo "$RESULT" | tail -n 1)" != "game saves ok" ]; then
+  echo "run-local.sh: the game saves checks FAILED" >&2
   exit 1
 fi
 

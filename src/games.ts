@@ -23,6 +23,10 @@ export interface Game {
   /** Same, for landscape. */
   minWidthLandscape?: number;
   minHeightLandscape?: number;
+  /** The game can keep its save in a signed-in player's account (it speaks the tag:ready / tag:load / tag:save messages). */
+  cloudSave?: boolean;
+  /** The game reads a "Move to a new phone" link (#move=...); the play page passes the link's fragment on to it. */
+  moveCode?: boolean;
 }
 
 /** Min-size hints must be sane CSS pixel sizes; anything else is ignored so the play page defaults apply. */
@@ -86,6 +90,8 @@ function parseGame(raw: unknown): Game | null {
     minHeight: minSize(r.minHeight),
     minWidthLandscape: minSize(r.minWidthLandscape),
     minHeightLandscape: minSize(r.minHeightLandscape),
+    cloudSave: r.cloudSave === true && r.external !== true ? true : undefined,
+    moveCode: r.moveCode === true && r.external !== true ? true : undefined,
   };
 }
 
