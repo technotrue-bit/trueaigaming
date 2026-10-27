@@ -27,6 +27,11 @@ export interface Game {
   cloudSave?: boolean;
   /** The game reads a "Move to a new phone" link (#move=...); the play page passes the link's fragment on to it. */
   moveCode?: boolean;
+  /**
+   * The play page keeps a copy of the game's save in this site's storage on the device (it speaks tag:hello /
+   * tag:mirror / tag:put), with no account. Games with cloudSave get the copy too.
+   */
+  deviceCopy?: boolean;
 }
 
 /** Min-size hints must be sane CSS pixel sizes; anything else is ignored so the play page defaults apply. */
@@ -92,6 +97,7 @@ function parseGame(raw: unknown): Game | null {
     minHeightLandscape: minSize(r.minHeightLandscape),
     cloudSave: r.cloudSave === true && r.external !== true ? true : undefined,
     moveCode: r.moveCode === true && r.external !== true ? true : undefined,
+    deviceCopy: r.deviceCopy === true && r.external !== true ? true : undefined,
   };
 }
 
