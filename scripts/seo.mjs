@@ -43,6 +43,7 @@ export const PAGES_DIR = join(ROOT, 'games');
  * @property {boolean} [external] Submitted game hosted elsewhere: Play goes to playUrl in a new tab, never /play.html.
  * @property {boolean} [cloudSave] The game keeps its save in a signed-in player's account. Same rule as src/games.ts.
  * @property {boolean} [moveCode] The play page passes a #move= link on to the game. Same rule as src/games.ts.
+ * @property {boolean} [deviceCopy] The play page keeps a copy of the game's save on the device. Same rule as src/games.ts.
  */
 
 // ---------- Escaping ----------
@@ -184,6 +185,7 @@ export function loadGames(file = join(ROOT, 'public/games.json')) {
       // dist/games.json is this list, so a flag left out here never reaches the play page.
       cloudSave: r.cloudSave === true && r.external !== true ? true : undefined,
       moveCode: r.moveCode === true && r.external !== true ? true : undefined,
+      deviceCopy: r.deviceCopy === true && r.external !== true ? true : undefined,
     });
   }
   return games;

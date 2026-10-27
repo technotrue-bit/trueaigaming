@@ -46,6 +46,7 @@
     "status": "beta",
     "repo": "https://github.com/technotrue-bit/Squishy-closet",
     "moveCode": true,
+    "deviceCopy": true,
     "thumbnailWebp": "/thumbs/squishy-closet.webp"
   }
 ]

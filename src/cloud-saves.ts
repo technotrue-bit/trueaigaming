@@ -9,8 +9,8 @@ import { applyPut, readCopy, writeCopy } from './shared/device-copy.mjs';
  * game never sees the sign-in: the page reads and writes the game_saves row with the player's session.
  */
 export function startCloudSaves(game: Game, frame: HTMLIFrameElement): void {
+  if (game.cloudSave || game.deviceCopy) startDeviceCopy(game, frame);
   if (!game.cloudSave) return;
-  startDeviceCopy(game, frame);
   if (import.meta.env.VITE_SUBMISSIONS_ENABLED !== 'true') return;
   const origin = new URL(game.playUrl).origin;
   let sync: ReturnType<typeof createSaveSync> | null = null;
@@ -63,8 +63,9 @@ export function startCloudSaves(game: Game, frame: HTMLIFrameElement): void {
 }
 
 /**
- * Keeps the game's save on this device in the site's own storage, signed in or not (see shared/device-copy.mjs).
- * iPhone Safari forgets a framed game's storage when Safari closes; this copy is what brings it back.
+ * Keeps the game's save on this device in the site's own storage, signed in or not (see shared/device-copy.mjs), for
+ * games with cloudSave or deviceCopy. iPhone Safari forgets a framed game's storage when Safari closes; this copy is
+ * what brings it back.
  */
 function startDeviceCopy(game: Game, frame: HTMLIFrameElement): void {
   const origin = new URL(game.playUrl).origin;
