@@ -1,7 +1,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { countText, gridHtml, homeJsonLd, loadGames, sitemapXml, writeGamePages, type Game } from './scripts/seo.mjs';
+import { countText, gridHtml, homeJsonLd, llmsFullTxt, llmsTxt, loadGames, sitemapXml, writeGamePages, type Game } from './scripts/seo.mjs';
 import { loadPublishedGames } from './scripts/published-games.mjs';
 
 const GAMES_JSON = resolve(import.meta.dirname, 'public/games.json');
@@ -20,7 +20,7 @@ async function combinedGames(): Promise<Game[]> {
 
 /**
  * SEO from the combined list: prerendered home grid + JSON-LD, generated /games/<id>/ pages (written to games/,
- * gitignored), dist/sitemap.xml and dist/games.json. Dev serves the same list at /games.json. Adding a game to
+ * gitignored), dist/sitemap.xml, dist/llms.txt, dist/llms-full.txt and dist/games.json. Dev serves the same list at /games.json. Adding a game to
  * games.json, or approving a submission, updates all of it.
  */
 function seo(initial: Game[]): Plugin {
@@ -41,6 +41,8 @@ function seo(initial: Game[]): Plugin {
     },
     generateBundle() {
       this.emitFile({ type: 'asset', fileName: 'sitemap.xml', source: sitemapXml(games) });
+      this.emitFile({ type: 'asset', fileName: 'llms.txt', source: llmsTxt(games) });
+      this.emitFile({ type: 'asset', fileName: 'llms-full.txt', source: llmsFullTxt(games) });
     },
     closeBundle() {
       // Runs after Vite has copied public/ into dist/, so this replaces the copy of public/games.json. The browser fetches
@@ -70,6 +72,14 @@ function seo(initial: Game[]): Plugin {
       server.middlewares.use('/sitemap.xml', (_req, res) => {
         res.setHeader('Content-Type', 'application/xml');
         res.end(sitemapXml(games));
+      });
+      server.middlewares.use('/llms.txt', (_req, res) => {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.end(llmsTxt(games));
+      });
+      server.middlewares.use('/llms-full.txt', (_req, res) => {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.end(llmsFullTxt(games));
       });
     },
   };
