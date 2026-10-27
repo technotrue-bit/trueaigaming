@@ -1,5 +1,6 @@
 import type { Game } from './games';
 import { createSaveSync } from './shared/cloud-sync.mjs';
+import { applyPut, readCopy, writeCopy } from './shared/device-copy.mjs';
 
 /**
  * Account saves on the play page, for games that opt in with "cloudSave" in games.json (Flag Catch). Only when
@@ -8,7 +9,9 @@ import { createSaveSync } from './shared/cloud-sync.mjs';
  * game never sees the sign-in: the page reads and writes the game_saves row with the player's session.
  */
 export function startCloudSaves(game: Game, frame: HTMLIFrameElement): void {
-  if (import.meta.env.VITE_SUBMISSIONS_ENABLED !== 'true' || !game.cloudSave) return;
+  if (!game.cloudSave) return;
+  startDeviceCopy(game, frame);
+  if (import.meta.env.VITE_SUBMISSIONS_ENABLED !== 'true') return;
   const origin = new URL(game.playUrl).origin;
   let sync: ReturnType<typeof createSaveSync> | null = null;
 
@@ -56,5 +59,33 @@ export function startCloudSaves(game: Game, frame: HTMLIFrameElement): void {
   window.addEventListener('online', () => void sync?.retry());
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') void sync?.retry();
+  });
+}
+
+/**
+ * Keeps the game's save on this device in the site's own storage, signed in or not (see shared/device-copy.mjs).
+ * iPhone Safari forgets a framed game's storage when Safari closes; this copy is what brings it back.
+ */
+function startDeviceCopy(game: Game, frame: HTMLIFrameElement): void {
+  const origin = new URL(game.playUrl).origin;
+  const storage = (() => {
+    try {
+      return window.localStorage;
+    } catch {
+      return null;
+    }
+  })();
+  if (!storage) return;
+  let copy = readCopy(storage, game.id) as Record<string, string>;
+  window.addEventListener('message', (event: MessageEvent) => {
+    if (event.source !== frame.contentWindow || event.origin !== origin) return;
+    const msg = event.data as { type?: unknown; game?: unknown; key?: unknown; value?: unknown } | null;
+    if (!msg || msg.game !== game.id) return;
+    if (msg.type === 'tag:hello') {
+      frame.contentWindow?.postMessage({ type: 'tag:mirror', game: game.id, v: 1, data: copy }, origin);
+    } else if (msg.type === 'tag:put') {
+      const next = applyPut(copy, msg.key, msg.value);
+      if (next && writeCopy(storage, game.id, next)) copy = next;
+    }
   });
 }
