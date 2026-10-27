@@ -1,6 +1,6 @@
 // @ts-check
 // Build-time SEO helpers: validated games.json, prerendered home cards, one static page per game,
-// JSON-LD and sitemap.xml. Used by vite.config.ts; nothing here ships to the browser.
+// JSON-LD, sitemap.xml and llms.txt. Used by vite.config.ts; nothing here ships to the browser.
 import { readFileSync, writeFileSync, mkdirSync, rmSync, openSync, readSync, closeSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { isBlobThumbnailUrl } from '../src/shared/submission-rules.mjs';
@@ -485,5 +485,88 @@ export function sitemapXml(games) {
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls.map((u) => `  <url><loc>${esc(u)}</loc></url>`).join('\n')}
 </urlset>
+`;
+}
+
+// ---------- llms.txt / llms-full.txt ----------
+// Plain-text guides for AI assistants and agents (https://llmstxt.org): what the site is, where each game lives and
+// where the machine-readable list is. Built from the same list as the sitemap, so a new game shows up in all of them.
+
+const SITE_SUMMARY = 'A free arcade of games built with AI. Every game plays instantly in a web browser on a phone or computer, with nothing to install and no account needed.';
+
+/** One line of markdown-safe text: no line breaks, and square brackets can't end a link label. @param {string} s */
+const mdLine = (s) => s.replace(/\s+/g, ' ').replace(/\[/g, '(').replace(/\]/g, ')').trim();
+
+/** "A demo game" -> "A demo game." @param {string} s */
+const sentence = (s) => {
+  const t = mdLine(s);
+  return t && !/[.!?]$/.test(t) ? `${t}.` : t;
+};
+
+/** @param {Game} g */
+function llmsGameLine(g) {
+  const desc = sentence(g.description);
+  const players = playersText(g);
+  const facts = [players, g.status === 'live' ? '' : `status: ${g.status}`].filter(Boolean).join(', ');
+  return `- [${mdLine(g.name)}](${abs(gamePath(g))}): ${desc}${facts ? ` (${facts})` : ''} Play: ${g.playUrl}`;
+}
+
+const LLMS_PAGES = `## About the site
+
+- [Privacy](${ORIGIN}/privacy.html): what the site stores, and how to delete it
+- [Terms](${ORIGIN}/terms.html): the rules for playing and for sharing your own game
+- [Share your game](${ORIGIN}/account): signed-in players (13 and up) can submit a game made with AI; it appears after review
+- [Support on Ko-fi](${KOFI_URL}): tips keep the games free
+- [${SITE_NAME} on X](${X_URL}): news and new games`;
+
+/** @param {Game[]} games */
+export function llmsTxt(games) {
+  return `# ${SITE_NAME}
+
+> ${SITE_SUMMARY}
+
+Each game has its own page on ${SITE_NAME} with a description and a Play button; the "Play" link goes straight to the game. Games are free. Accounts are optional and only used to share your own game or keep progress in some games across devices.
+
+## Games
+
+${games.map(llmsGameLine).join('\n')}
+
+## Machine-readable
+
+- [Games list (JSON)](${ORIGIN}/games.json): every game with id, name, description, playUrl, status and thumbnail
+- [Full guide](${ORIGIN}/llms-full.txt): this file plus each game's full description and how it was made
+- [Sitemap](${ORIGIN}/sitemap.xml)
+
+${LLMS_PAGES}
+`;
+}
+
+/** @param {Game[]} games */
+export function llmsFullTxt(games) {
+  const sections = games.map((g) => {
+    const players = playersText(g);
+    const lines = [
+      `## ${mdLine(g.name)}`,
+      '',
+      sentence(g.longDescription ?? gameDescription(g)),
+      '',
+      `- Page: ${abs(gamePath(g))}`,
+      `- Play: ${g.playUrl}`,
+      players ? `- For ${players}` : '',
+      `- Status: ${g.status}`,
+      `- Made by: ${mdLine(g.author)}`,
+      g.repo ? `- Source: ${g.repo}` : '',
+    ].filter((l, i, all) => l !== '' || all[i - 1] !== '');
+    if (g.about) lines.push('', sentence(g.about));
+    if (g.howItWasMade) lines.push('', `How it was made: ${sentence(g.howItWasMade)}`);
+    return lines.join('\n').replace(/\n{3,}/g, '\n\n');
+  });
+  return `# ${SITE_NAME}
+
+> ${SITE_SUMMARY}
+
+${sections.join('\n\n')}
+
+${LLMS_PAGES}
 `;
 }
