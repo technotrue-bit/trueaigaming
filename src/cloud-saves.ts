@@ -6,7 +6,8 @@ import { applyPut, readCopy, writeCopy } from './shared/device-copy.mjs';
  * Account saves on the play page, for games that opt in with "cloudSave" in games.json (Flag Catch). Only when
  * accounts are switched on and the player is signed in; otherwise the game keeps its save on the device and this
  * page never answers it. The page talks to the game only through postMessage with the game's own origin, and the
- * game never sees the sign-in: the page reads and writes the game_saves row with the player's session.
+ * game never sees the sign-in: the page reads and writes the game_saves row with the player's session. Signed in, the
+ * page also tells the game the player's public username ("tag:player"), which Flag Catch shows on its minimap.
  */
 export function startCloudSaves(game: Game, frame: HTMLIFrameElement): void {
   if (game.cloudSave || game.deviceCopy) startDeviceCopy(game, frame);
@@ -14,11 +15,27 @@ export function startCloudSaves(game: Game, frame: HTMLIFrameElement): void {
   if (import.meta.env.VITE_SUBMISSIONS_ENABLED !== 'true') return;
   const origin = new URL(game.playUrl).origin;
   let sync: ReturnType<typeof createSaveSync> | null = null;
+  let handle: Promise<string | null> | null = null;
+
+  /** The player's username, read once a visit. Null when it cannot be read; the game then says "You". */
+  async function readHandle(): Promise<string | null> {
+    const { apiFetch } = await import('./account/api');
+    try {
+      const reply = await apiFetch<{ profile?: { handle?: unknown } }>('/api/profile');
+      return typeof reply.profile?.handle === 'string' ? reply.profile.handle : null;
+    } catch {
+      return null;
+    }
+  }
 
   async function begin(): Promise<void> {
     const { supabase } = await import('./account/client');
     const { data } = await supabase.auth.getSession();
     if (!data.session) return;
+    handle ??= readHandle();
+    void handle.then((name) => {
+      if (name) frame.contentWindow?.postMessage({ type: 'tag:player', game: game.id, v: 1, name }, origin);
+    });
     const rows = () => supabase.from('game_saves');
     sync ??= createSaveSync({
       store: {
