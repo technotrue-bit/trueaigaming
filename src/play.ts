@@ -2,6 +2,7 @@ import { trackEvent, trackShares } from './analytics';
 import { attachFeedback } from './feedback';
 import { startCloudSaves } from './cloud-saves';
 import { el, loadGames, type Game } from './games';
+import { DAILY_GAME } from './shared/daily.mjs';
 
 /** Safari (incl. older iPadOS) only ships the prefixed Fullscreen API. */
 interface WebkitDocument extends Document {
@@ -213,7 +214,17 @@ function showMessage(heading: string, message: string): void {
   frameWrap.replaceChildren(el('div', { class: 'stage-msg' }, title, el('p', {}, message), el('a', { class: 'btn btn-primary', href: '/' }, 'Back to the arcade')));
 }
 
-const id = new URLSearchParams(location.search).get('id');
+const params = new URLSearchParams(location.search);
+const id = params.get('id');
+
+/** The game's address for the frame. Sent from the home page's "Today" card, Flag Catch gets ?daily=1 (and nothing else). */
+function frameSrc(game: Game): string {
+  const base = game.playUrl.split('#')[0];
+  if (game.id !== DAILY_GAME || params.get('daily') !== '1') return base;
+  const url = new URL(base);
+  url.searchParams.set('daily', '1');
+  return url.href;
+}
 
 try {
   const game = (await loadGames()).find((g) => g.id === id);
@@ -235,7 +246,7 @@ try {
     const moveHash = game.moveCode && typeof move === 'string' && /^#move=[A-Za-z0-9_-]+$/.test(move) ? move : '';
     const frame = el('iframe', {
       class: 'game-frame',
-      src: game.playUrl.split('#')[0] + moveHash,
+      src: frameSrc(game) + moveHash,
       title: game.name,
       allow: 'fullscreen; autoplay; gamepad; clipboard-write; accelerometer; gyroscope; screen-wake-lock; web-share; xr-spatial-tracking',
       allowfullscreen: '',
