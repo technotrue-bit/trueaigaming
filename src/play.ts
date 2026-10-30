@@ -25,7 +25,7 @@ const frameWrap = document.getElementById('frame-wrap') as HTMLDivElement;
    Size the stage to the area the user can actually see (visualViewport tracks Safari's bars showing and hiding,
    rotation and full screen), and publish it to CSS on <html>:
      --vw / --vh               visible size in px
-     --usable-w / --usable-h   visible size minus safe-area insets (what the game frame gets)
+     --usable-w / --usable-h   visible size minus safe-area insets and the control pill's strip (what the game frame gets)
      --vmin                    1% of the smaller visible side, for sizing the overlay
    plus is-portrait / is-landscape and a size class from the usable area's shorter side:
      size-compact < 500px (phones)  <=  size-regular < 900px (tablets, laptops)  <=  size-wide.
@@ -77,6 +77,12 @@ function measure(): void {
   root.classList.toggle('is-portrait', !landscape);
   for (const [name] of SIZE_CLASSES) root.classList.toggle(name, name === sizeClass);
   root.classList.add('has-vp');
+  // The frame's area also leaves out the control pill's strip, so read it back once the classes above are applied.
+  const area = frameWrap.getBoundingClientRect();
+  if (area.width > 0 && area.height > 0) {
+    root.style.setProperty('--usable-w', px(area.width));
+    root.style.setProperty('--usable-h', px(area.height));
+  }
   fitFrame(landscape);
 }
 

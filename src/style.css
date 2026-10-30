@@ -515,6 +515,8 @@ a {
 }
 
 .stage {
+  --hud-u: clamp(26px, calc(var(--vmin, 1vmin) * 7), 36px); /* drawn button size */
+  --hud-hit: max(44px, calc(var(--hud-u) + 12px)); /* tap target, and the width of the strip the pill sits in */
   position: absolute;
   top: 0;
   right: 0;
@@ -533,6 +535,16 @@ a {
   right: env(safe-area-inset-right, 0px);
   bottom: env(safe-area-inset-bottom, 0px);
   left: env(safe-area-inset-left, 0px);
+}
+/* The control pill gets a strip of its own beside the game, so it never sits on a game's buttons (a tap meant for a
+   game's Back or arrow would otherwise leave the game or open a new tab). Portrait: a strip along the top. Landscape:
+   a strip down the left side, which on a phone with a notch is the safe area the game can't use anyway. */
+.has-vp .frame-wrap {
+  top: calc(env(safe-area-inset-top, 0px) + var(--hud-hit));
+}
+.has-vp.is-landscape .frame-wrap {
+  top: env(safe-area-inset-top, 0px);
+  left: max(env(safe-area-inset-left, 0px), var(--hud-hit));
 }
 .game-frame {
   display: block;
@@ -573,12 +585,10 @@ a {
   margin: 0;
 }
 
-/* Small pill, clear of the game's own corner controls: top-center in portrait, a vertical pill on the left
-   edge in landscape (where top-center would cover the game's heading). Only the buttons take touches.
+/* Small pill in its own strip beside the game (see .frame-wrap): top-center in portrait, a vertical pill on the left
+   edge in landscape. Only the buttons take touches.
    The drawn pill is the ::before below; each button's box is a transparent >= 44px tap target around it. */
 .hud {
-  --hud-u: clamp(26px, calc(var(--vmin, 1vmin) * 7), 36px); /* drawn button size */
-  --hud-hit: max(44px, calc(var(--hud-u) + 12px)); /* tap target */
   position: absolute;
   top: env(safe-area-inset-top, 0px);
   left: 50%;
@@ -591,7 +601,7 @@ a {
 }
 .is-landscape .hud {
   top: 50%;
-  left: env(safe-area-inset-left, 0px);
+  left: max(0px, calc(env(safe-area-inset-left, 0px) - var(--hud-hit)));
   flex-direction: column;
   transform: translateY(-50%);
 }
