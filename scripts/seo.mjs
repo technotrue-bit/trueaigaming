@@ -44,6 +44,7 @@ export const PAGES_DIR = join(ROOT, 'games');
  * @property {boolean} [cloudSave] The game keeps its save in a signed-in player's account. Same rule as src/games.ts.
  * @property {boolean} [moveCode] The play page passes a #move= link on to the game. Same rule as src/games.ts.
  * @property {boolean} [deviceCopy] The play page keeps a copy of the game's save on the device. Same rule as src/games.ts.
+ * @property {boolean} [online] The game has live online matches and gets a match ticket. Same rule as src/games.ts.
  */
 
 // ---------- Escaping ----------
@@ -186,6 +187,7 @@ export function loadGames(file = join(ROOT, 'public/games.json')) {
       cloudSave: r.cloudSave === true && r.external !== true ? true : undefined,
       moveCode: r.moveCode === true && r.external !== true ? true : undefined,
       deviceCopy: r.deviceCopy === true && r.external !== true ? true : undefined,
+      online: r.online === true && r.external !== true ? true : undefined,
     });
   }
   return games;

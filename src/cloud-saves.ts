@@ -11,6 +11,7 @@ import { applyPut, readCopy, writeCopy } from './shared/device-copy.mjs';
  */
 export function startCloudSaves(game: Game, frame: HTMLIFrameElement): void {
   if (game.cloudSave || game.deviceCopy) startDeviceCopy(game, frame);
+  if (game.online) startOnline(game, frame);
   if (!game.cloudSave) return;
   if (import.meta.env.VITE_SUBMISSIONS_ENABLED !== 'true') return;
   const origin = new URL(game.playUrl).origin;
@@ -104,6 +105,48 @@ function startDeviceCopy(game: Game, frame: HTMLIFrameElement): void {
     } else if (msg.type === 'tag:put') {
       const next = applyPut(copy, msg.key, msg.value);
       if (next && writeCopy(storage, game.id, next)) copy = next;
+    }
+  });
+}
+
+/** A new ticket this long before the old one runs out, so a long play session never meets an expired one. */
+const TICKET_REFRESH_MS = 3 * 3600 * 1000;
+
+/**
+ * Online matches, for games with "online" in games.json (Flag Catch). When the game says it's ready, the page tells it
+ * whether the player is signed in ("tag:online"). Signed in, it also hands over a match ticket from /api/match-ticket
+ * (the player's username, signed by the site), the site's public key that every phone in a room checks tickets
+ * with, and the site's Supabase address and public anon key, which rooms meet on. The sign-in itself stays here.
+ */
+function startOnline(game: Game, frame: HTMLIFrameElement): void {
+  const origin = new URL(game.playUrl).origin;
+  const post = (data: object) => frame.contentWindow?.postMessage({ type: 'tag:online', game: game.id, v: 1, ...data }, origin);
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  async function tell(): Promise<void> {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    const url: string | undefined = import.meta.env.VITE_SUPABASE_URL;
+    const key: string | undefined = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (import.meta.env.VITE_SUBMISSIONS_ENABLED !== 'true' || !url || !key) return void post({ signedIn: false });
+    const { supabase } = await import('./account/client');
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) return void post({ signedIn: false });
+    const { apiFetch } = await import('./account/api');
+    const reply = await apiFetch<{ ticket?: unknown; exp?: unknown; key?: unknown }>('/api/match-ticket');
+    if (typeof reply.ticket !== 'string' || typeof reply.exp !== 'number' || !reply.key) return void post({ signedIn: false });
+    post({ signedIn: true, ticket: reply.ticket, key: reply.key, realtime: { url, key } });
+    timer = setTimeout(() => void tell().catch(() => {}), Math.max(60_000, reply.exp - Date.now() - TICKET_REFRESH_MS));
+  }
+
+  window.addEventListener('message', (event: MessageEvent) => {
+    if (event.source !== frame.contentWindow || event.origin !== origin) return;
+    const msg = event.data as { type?: unknown; game?: unknown } | null;
+    if (msg?.type === 'tag:ready' && msg.game === game.id) {
+      void tell().catch((err) => {
+        console.warn('Online play is off for this visit.', err);
+        post({ signedIn: false });
+      });
     }
   });
 }

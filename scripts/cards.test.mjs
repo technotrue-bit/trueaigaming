@@ -208,21 +208,21 @@ test('home.ts and seo.mjs use the same external cover label suffix', () => {
   assert.ok(readFileSync(join(ROOT, 'scripts/seo.mjs'), 'utf8').includes(suffix));
 });
 
-test('loadGames keeps cloudSave, moveCode and deviceCopy, only when true and the game is not external', (t) => {
+test('loadGames keeps cloudSave, moveCode, deviceCopy and online, only when true and the game is not external', (t) => {
   const thumbnail = '/thumbs/flag-catch.png';
   const games = loadGames(
     gamesFile(t, [
-      { ...entry, id: 'saves', thumbnail, cloudSave: true, moveCode: true, deviceCopy: true },
-      { ...entry, id: 'strings', thumbnail, cloudSave: 'true', moveCode: 1, deviceCopy: 'yes' },
-      { ...entry, id: 'ext', thumbnail, external: true, cloudSave: true, moveCode: true, deviceCopy: true },
+      { ...entry, id: 'saves', thumbnail, cloudSave: true, moveCode: true, deviceCopy: true, online: true },
+      { ...entry, id: 'strings', thumbnail, cloudSave: 'true', moveCode: 1, deviceCopy: 'yes', online: 'true' },
+      { ...entry, id: 'ext', thumbnail, external: true, cloudSave: true, moveCode: true, deviceCopy: true, online: true },
     ]),
   );
   assert.deepEqual(
-    games.map((g) => [g.id, g.cloudSave, g.moveCode, g.deviceCopy]),
+    games.map((g) => [g.id, g.cloudSave, g.moveCode, g.deviceCopy, g.online]),
     [
-      ['saves', true, true, true],
-      ['strings', undefined, undefined, undefined],
-      ['ext', undefined, undefined, undefined],
+      ['saves', true, true, true, true],
+      ['strings', undefined, undefined, undefined, undefined],
+      ['ext', undefined, undefined, undefined, undefined],
     ],
   );
 });
@@ -230,11 +230,13 @@ test('loadGames keeps cloudSave, moveCode and deviceCopy, only when true and the
 test('the real games.json keeps account saves on Flag Catch, and the move code and device copy on Aurora\'s World', () => {
   const games = loadGames();
   assert.equal(games.find((g) => g.id === 'flag-catch')?.cloudSave, true);
+  assert.equal(games.find((g) => g.id === 'flag-catch')?.online, true);
   const aurora = games.find((g) => g.id === 'squishy-closet');
   assert.equal(aurora?.moveCode, true);
   assert.equal(aurora?.deviceCopy, true);
   // A game for young children: never account saves (see supabase/migrations/0002_game_saves.sql).
   assert.equal(aurora?.cloudSave, undefined);
+  assert.equal(aurora?.online, undefined);
 });
 
 test('loadGames keeps the four play-page min sizes, rounded to whole pixels', (t) => {
