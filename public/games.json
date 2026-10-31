@@ -45,7 +45,7 @@
     "maxPlayers": 1,
     "playUrl": "https://squishy-closet.vercel.app",
     "thumbnail": "/thumbs/squishy-closet.png",
-    "status": "beta",
+    "status": "live",
     "repo": "https://github.com/technotrue-bit/Squishy-closet",
     "moveCode": true,
     "deviceCopy": true,
