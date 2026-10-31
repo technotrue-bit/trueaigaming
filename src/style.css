@@ -406,6 +406,13 @@ a {
   color: var(--muted);
   font-size: 0.8rem;
 }
+/* The daily challenge chip: a touch brighter than the other chips, still small. */
+.card-facts .fact-daily {
+  border-color: rgb(255 230 0 / 0.7);
+  background: rgb(255 230 0 / 0.1);
+  color: var(--yellow);
+  font-weight: 700;
+}
 
 /* Placeholder card after the games: dashed, no glow, never lifts on hover. */
 .card-soon,

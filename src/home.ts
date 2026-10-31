@@ -41,8 +41,9 @@ function card(game: Game, index: number): HTMLLIElement {
     actions.append(el('a', { class: 'btn btn-link', href: game.repo, target: '_blank', rel: 'noopener' }, 'Source'));
   }
   // Same chips as cardHtml() in scripts/seo.mjs.
-  const chips = [playersText(game), game.daily ? 'Daily challenge' : ''].filter(Boolean);
-  const facts = chips.length ? el('ul', { class: 'card-facts' }, ...chips.map((c) => el('li', {}, c))) : null;
+  const players = playersText(game);
+  const chips = [...(players ? [el('li', {}, players)] : []), ...(game.daily ? [el('li', { class: 'fact-daily' }, '★ Daily challenge')] : [])];
+  const facts = chips.length ? el('ul', { class: 'card-facts' }, ...chips) : null;
 
   const head = el('div', { class: 'card-head' }, el('h3', { class: 'card-title' }, el('a', { href: `/games/${encodeURIComponent(game.id)}/` }, game.name)));
   const how = game.howItWasMade ? el('div', { class: 'card-how', id: `how-${game.id}`, hidden: '' }, el('p', {}, game.howItWasMade)) : null;

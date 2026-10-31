@@ -303,8 +303,9 @@ const coverLabel = (g) => `Play ${esc(g.name)}${g.external ? ' (opens in a new t
 export function cardHtml(g, index) {
   // One Play button. The play page's own controls can still open a hosted game in a new tab.
   const actions = [`<a class="btn btn-primary btn-play" ${playAttrs(g)}>Play now</a>`];
-  const chips = [playersText(g), g.daily ? 'Daily challenge' : ''].filter(Boolean);
-  const facts = chips.length ? `<ul class="card-facts">${chips.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>` : '';
+  const players = playersText(g);
+  const chips = [players ? `<li>${esc(players)}</li>` : '', g.daily ? '<li class="fact-daily">★ Daily challenge</li>' : ''].join('');
+  const facts = chips ? `<ul class="card-facts">${chips}</ul>` : '';
   if (g.repo) actions.push(`<a class="btn btn-link" href="${esc(g.repo)}" target="_blank" rel="noopener">Source</a>`);
   const id = esc(g.id);
   const info = g.howItWasMade
