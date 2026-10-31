@@ -178,49 +178,6 @@ a {
   96% { opacity: 0.6; }
 }
 
-/* ---------- Today's Flag ---------- */
-.today {
-  margin-bottom: 1.5rem;
-}
-.today-card {
-  display: grid;
-  gap: 0.35rem;
-  justify-items: start;
-  padding: 1rem 1.25rem 1.25rem;
-  background: var(--panel);
-  border: 2px solid var(--yellow);
-  border-radius: var(--radius);
-  box-shadow: 0 0 24px rgb(255 230 0 / 0.18);
-}
-.today-card.is-done {
-  border-color: var(--lime);
-  box-shadow: 0 0 24px rgb(125 255 58 / 0.18);
-}
-.today-kicker {
-  margin: 0;
-  font-weight: 800;
-  font-size: 0.8rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--yellow);
-}
-.today-card.is-done .today-kicker {
-  color: var(--lime);
-}
-.today-goal {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(1.25rem, 5vw, 1.75rem);
-  line-height: 1.15;
-}
-.today-where,
-.today-note {
-  margin: 0;
-}
-.today-card .btn {
-  margin-top: 0.5rem;
-}
-
 /* ---------- Grid ---------- */
 .section-head {
   display: flex;

@@ -37,6 +37,8 @@ export interface Game {
    * names the player by their username, so other players see only real usernames.
    */
   online?: boolean;
+  /** The game has a daily challenge of its own; its card gets a small "Daily challenge" chip. */
+  daily?: boolean;
 }
 
 /** Min-size hints must be sane CSS pixel sizes; anything else is ignored so the play page defaults apply. */
@@ -104,6 +106,7 @@ function parseGame(raw: unknown): Game | null {
     moveCode: r.moveCode === true && r.external !== true ? true : undefined,
     deviceCopy: r.deviceCopy === true && r.external !== true ? true : undefined,
     online: r.online === true && r.external !== true ? true : undefined,
+    daily: r.daily === true ? true : undefined,
   };
 }
 

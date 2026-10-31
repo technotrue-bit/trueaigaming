@@ -2,7 +2,6 @@ import { trackEvent, trackShares } from './analytics';
 import { attachFeedback } from './feedback';
 import { startCloudSaves } from './cloud-saves';
 import { el, loadGames, type Game } from './games';
-import { DAILY_GAME } from './shared/daily.mjs';
 
 /** Safari (incl. older iPadOS) only ships the prefixed Fullscreen API. */
 interface WebkitDocument extends Document {
@@ -217,10 +216,10 @@ function showMessage(heading: string, message: string): void {
 const params = new URLSearchParams(location.search);
 const id = params.get('id');
 
-/** The game's address for the frame. Sent from the home page's "Today" card, Flag Catch gets ?daily=1 (and nothing else). */
+/** The game's address for the frame. A game with a daily challenge gets ?daily=1 (and nothing else) from a link that carries it. */
 function frameSrc(game: Game): string {
   const base = game.playUrl.split('#')[0];
-  if (game.id !== DAILY_GAME || params.get('daily') !== '1') return base;
+  if (!game.daily || params.get('daily') !== '1') return base;
   const url = new URL(base);
   url.searchParams.set('daily', '1');
   return url.href;
