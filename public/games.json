@@ -28,6 +28,7 @@
     "repo": "https://github.com/technotrue-bit/Flag-Catch",
     "cloudSave": true,
     "online": true,
+    "daily": true,
     "minWidth": 340,
     "minHeight": 520,
     "minWidthLandscape": 560,

@@ -271,3 +271,9 @@ test('game page shows About and How it was made sections when set', async () => 
   assert.match(html, /<h2>How it was made<\/h2>/);
   assert.equal(aboutHtml(base), '');
 });
+
+test('a game with a daily challenge gets a quiet Daily challenge chip', () => {
+  assert.match(cardHtml({ ...base, minPlayers: 1, maxPlayers: 8, daily: true }, 0), /<ul class="card-facts"><li>1–8 players<\/li><li class="fact-daily">★ Daily challenge<\/li><\/ul>/);
+  assert.match(cardHtml({ ...base, daily: true }, 0), /<ul class="card-facts"><li class="fact-daily">★ Daily challenge<\/li><\/ul>/);
+  assert.ok(!cardHtml({ ...base, minPlayers: 1, maxPlayers: 8 }, 0).includes('Daily challenge'));
+});
