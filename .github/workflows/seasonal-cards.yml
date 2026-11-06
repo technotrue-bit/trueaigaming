@@ -1,14 +1,20 @@
-# Keeps Aurora's World's game card in season. The game dresses up by the calendar (Halloween all October, cozy
-# autumn all November, and back to sunny the rest of the year), and its ?poster page shows that day's look with
-# the logo and no buttons. On the 1st of every month this retakes the card from it, the same way
-# scripts/thumb.mjs always has, and commits the new picture, which deploys the site.
-# Run it by hand from the Actions tab (Run workflow) after the game gets a new season or event.
+# Keeps Aurora's World's game card in season. The game follows the real seasons and lets a holiday take over while
+# it lasts (cozy autumn from the fall equinox until winter, Halloween all October, sunny otherwise), and its
+# ?poster page shows that day's look with the logo and no buttons. Every day this checks which look the poster
+# shows (scripts/seasonal-card.mjs), and only when it differs from the card's does it retake the card and commit
+# it, which deploys the site. So the card changes when a season or a holiday starts or ends, and not otherwise.
+# Run it by hand from the Actions tab (Run workflow, with "retake" ticked) to retake the card anyway.
 name: Seasonal game cards
 
 on:
   schedule:
-    - cron: "17 12 1 * *" # the 1st of each month, 12:17 UTC (early morning in the US)
-  workflow_dispatch: {}
+    - cron: "17 12 * * *" # every day, 12:17 UTC (early morning in the US)
+  workflow_dispatch:
+    inputs:
+      retake:
+        description: Retake the card even if the look hasn't changed
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -29,17 +35,19 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - name: Retake the card from the game's poster
-        run: node scripts/thumb.mjs "https://squishy-closet.vercel.app/?poster" public/thumbs/squishy-closet.png
+      - name: Check the game's look, and retake the card if it changed
+        id: card
+        run: node scripts/seasonal-card.mjs ${{ inputs.retake && '--force' || '' }}
       - name: Make the WebP copy
+        if: steps.card.outputs.changed == 'true'
         run: |
           sudo apt-get install -y --no-install-recommends webp
           cwebp -quiet -q 80 public/thumbs/squishy-closet.png -o public/thumbs/squishy-closet.webp
       - name: Commit the new card
+        if: steps.card.outputs.changed == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/thumbs/squishy-closet.png public/thumbs/squishy-closet.webp
-          if git diff --cached --quiet; then echo "Card unchanged"; exit 0; fi
-          git commit -m "Aurora's World: this month's card"
+          git add public/thumbs/squishy-closet.png public/thumbs/squishy-closet.webp scripts/card-looks.json
+          git commit -m "Aurora's World: a new card for the season"
           git push
